@@ -119,11 +119,32 @@ export default function RegisterPage() {
 
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
 
-    // Mock registration success
-    router.push("/login?registered=true")
+      const data = await response.json()
+
+      if (response.ok) {
+        router.push("/login?registered=true")
+      } else {
+        setError(data.error || "Erreur lors de la création du compte")
+      }
+    } catch (error) {
+      console.error("Registration error:", error)
+      setError("Erreur serveur. Veuillez réessayer plus tard.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSocialLogin = async (provider: string) => {
