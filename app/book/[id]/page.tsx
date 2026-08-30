@@ -32,6 +32,8 @@ type BookDetailsPageProps = {
   params: Promise<{ id: string }>
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function BookDetailsPage({ params }: BookDetailsPageProps) {
   const { id } = await params
   const session = await auth()

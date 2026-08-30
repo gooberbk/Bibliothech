@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { Sparkles } from "lucide-react"
 import { getResourcesListCached } from "@/lib/catalog-cache"
 
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   const resources = await getResourcesListCached()
 
