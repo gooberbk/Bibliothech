@@ -36,36 +36,75 @@ export const dynamic = 'force-dynamic'
 
 export default async function BookDetailsPage({ params }: BookDetailsPageProps) {
   const { id } = await params
-  const session = await auth()
+  let session
+  let resource
+  let relatedResources = []
 
-  const resource = await db.resource.findUnique({
-    where: { id },
-    include: {
-      favoritedBy: session?.user.id
-        ? {
-            where: { userId: session.user.id },
-            select: { id: true },
-          }
-        : false,
-    },
-  })
+  try {
+    session = await auth()
+    resource = await db.resource.findUnique({
+      where: { id },
+      include: {
+        favoritedBy: session?.user.id
+          ? {
+              where: { userId: session.user.id },
+              select: { id: true },
+            }
+          : false,
+      },
+    })
 
-  if (!resource) {
-    notFound()
+    if (resource) {
+      relatedResources = await db.resource.findMany({
+        where: {
+          id: { not: resource.id },
+          category: resource.category,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 4,
+      })
+    }
+  } catch (error) {
+    console.error("Error fetching book details:", error)
+    // Return a simple error page
+    return (
+      <div className="flex min-h-screen flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Ressource non disponible</h1>
+            <p className="mt-2 text-muted-foreground">
+              Impossible de charger les détails de cette ressource.
+            </p>
+            <a href="/" className="mt-4 inline-block text-primary hover:underline">
+              Retour à l'accueil
+            </a>
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const relatedResources = await db.resource.findMany({
-    where: {
-      id: { not: resource.id },
-      category: resource.category,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 4,
-  })
+  if (!resource) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Ressource non trouvée</h1>
+            <p className="mt-2 text-muted-foreground">
+              Cette ressource n'existe pas ou a été supprimée.
+            </p>
+            <a href="/" className="mt-4 inline-block text-primary hover:underline">
+              Retour à l'accueil
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const canRenderCover = isSecureUploadthingUrl(resource.coverUrl)
   const canDownloadFile = isSecureUploadthingUrl(resource.fileUrl)
-  const isAuthenticated = Boolean(session?.user.id)
+  const isAuthenticated = Boolean(session?.user?.id)
   const isFavorite = Boolean(resource.favoritedBy?.length)
 
   return (

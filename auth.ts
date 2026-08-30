@@ -22,18 +22,23 @@ export const authConfig = {
         password: { label: "Password", type: "password" },
       },
       async authorize(rawCredentials) {
-        const parsed = signInSchema.safeParse(rawCredentials)
-        if (!parsed.success) return null
+        try {
+          const parsed = signInSchema.safeParse(rawCredentials)
+          if (!parsed.success) return null
 
-        const user = await db.user.findUnique({
-          where: { email: parsed.data.email },
-        })
+          const user = await db.user.findUnique({
+            where: { email: parsed.data.email },
+          })
 
-        if (!user?.password) return null
-        const isValid = await compare(parsed.data.password, user.password)
-        if (!isValid) return null
+          if (!user?.password) return null
+          const isValid = await compare(parsed.data.password, user.password)
+          if (!isValid) return null
 
-        return user
+          return user
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
+        }
       },
     }),
   ],
