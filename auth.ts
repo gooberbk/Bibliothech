@@ -1,6 +1,5 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@auth/prisma-adapter"
 import { compare } from "bcryptjs"
 import type { Role } from "@prisma/client"
 import { z } from "zod"
@@ -11,9 +10,8 @@ const signInSchema = z.object({
   password: z.string().min(6, "Mot de passe invalide"),
 })
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(db),
-  session: { strategy: "database" },
+export const authConfig = {
+  session: { strategy: "jwt" as const },
   pages: {
     signIn: "/login",
   },
@@ -40,13 +38,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
-      const role = (user as { role?: Role }).role ?? "USER"
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.role = (user as { role?: Role }).role ?? "USER"
+      }
+      return token
+    },
+    async session({ session, token }) {
       if (session.user) {
-        session.user.id = user.id
-        session.user.role = role
+        session.user.id = token.id as string
+        session.user.role = token.role as Role
       }
       return session
     },
   },
-})
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
