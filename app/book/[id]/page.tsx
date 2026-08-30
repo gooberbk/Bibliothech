@@ -24,7 +24,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { auth } from "@/auth"
 import { db } from "@/lib/db"
 import { isSecureUploadthingUrl } from "@/lib/uploadthing-security"
 
@@ -36,22 +35,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function BookDetailsPage({ params }: BookDetailsPageProps) {
   const { id } = await params
-  let session
   let resource
   let relatedResources = []
 
   try {
-    session = await auth()
     resource = await db.resource.findUnique({
       where: { id },
-      include: {
-        favoritedBy: session?.user.id
-          ? {
-              where: { userId: session.user.id },
-              select: { id: true },
-            }
-          : false,
-      },
     })
 
     if (resource) {
@@ -104,8 +93,6 @@ export default async function BookDetailsPage({ params }: BookDetailsPageProps) 
 
   const canRenderCover = isSecureUploadthingUrl(resource.coverUrl)
   const canDownloadFile = isSecureUploadthingUrl(resource.fileUrl)
-  const isAuthenticated = Boolean(session?.user?.id)
-  const isFavorite = Boolean(resource.favoritedBy?.length)
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -237,11 +224,9 @@ export default async function BookDetailsPage({ params }: BookDetailsPageProps) 
                   fileUrl={resource.fileUrl}
                   canDownload={canDownloadFile}
                   fileType="PDF"
-                  isAuthenticated={isAuthenticated}
                 />
                 <FavoriteButton
                   resourceId={resource.id}
-                  isAuthenticated={isAuthenticated}
                   initialIsFavorite={isFavorite}
                 />
               </div>

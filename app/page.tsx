@@ -4,7 +4,6 @@ import { CatalogueClient } from "@/components/catalogue-client"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles } from "lucide-react"
 import { getResourcesListCached } from "@/lib/catalog-cache"
-import { books } from "@/lib/data"
 
 export const dynamic = 'force-dynamic'
 
@@ -14,23 +13,8 @@ export default async function HomePage() {
     resources = await getResourcesListCached()
   } catch (error) {
     console.error("Error fetching resources from database:", error)
-    // Fallback to static data if database fails
-    resources = books.map(book => ({
-      id: book.id,
-      title: book.title,
-      author: book.author,
-      category: book.category,
-      type: book.type,
-      pageCount: book.pages,
-      fileSizeMb: parseFloat(book.size),
-      fileUrl: "",
-      fileKey: "",
-      coverUrl: book.coverUrl,
-      coverKey: "",
-      downloadCount: book.downloads,
-      createdAt: new Date(book.createdAt),
-      updatedAt: new Date(book.createdAt),
-    }))
+    // Return empty array if database fails
+    resources = []
   }
 
   return (

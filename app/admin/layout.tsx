@@ -126,8 +126,7 @@ export default function AdminLayout({
           </Breadcrumb>
 
           <Avatar className="h-9 w-9">
-            <AvatarImage src="" alt="Admin" />
-            <AvatarFallback>AB</AvatarFallback>
+            <AvatarFallback>AD</AvatarFallback>
           </Avatar>
         </header>
 

@@ -10,22 +10,9 @@ import {
   Sun,
   Moon,
   Menu,
-  Bookmark,
-  History,
-  ShieldCheck,
-  LogOut,
-  User,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Sheet,
   SheetContent,
@@ -33,41 +20,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-// Mock auth state - in production, use NextAuth
-const useAuth = () => {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false)
-  const [user, setUser] = React.useState<{
-    name: string
-    email: string
-    role: "USER" | "ADMIN"
-    avatar?: string
-  } | null>(null)
-
-  const login = () => {
-    setIsAuthenticated(true)
-    setUser({
-      name: "Ahmed Benali",
-      email: "a.benali@estin.dz",
-      role: "ADMIN",
-      avatar: undefined,
-    })
-  }
-
-  const logout = () => {
-    setIsAuthenticated(false)
-    setUser(null)
-  }
-
-  return { isAuthenticated, user, login, logout }
-}
 
 export function Navbar() {
   const { theme, setTheme } = useTheme()
   const [searchValue, setSearchValue] = React.useState("")
   const [mounted, setMounted] = React.useState(false)
-  const { isAuthenticated, user, login, logout } = useAuth()
 
   React.useEffect(() => {
     setMounted(true)
@@ -125,77 +82,9 @@ export function Navbar() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex md:items-center md:gap-2">
-            {!isAuthenticated ? (
-              <>
-                <Button variant="outline" onClick={login}>
-                  Connexion
-                </Button>
-                <Button>Inscription</Button>
-              </>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="relative h-9 w-9 rounded-full"
-                  >
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={user?.avatar} alt={user?.name} />
-                      <AvatarFallback>
-                        {user?.name
-                          ?.split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {user?.name}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user?.email}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/favorites" className="flex items-center gap-2">
-                      <Bookmark className="h-4 w-4" />
-                      Mes Favoris
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/history" className="flex items-center gap-2">
-                      <History className="h-4 w-4" />
-                      Historique
-                    </Link>
-                  </DropdownMenuItem>
-                  {user?.role === "ADMIN" && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin" className="flex items-center gap-2">
-                          <ShieldCheck className="h-4 w-4" />
-                          Tableau de Bord Admin
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={logout}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Déconnexion
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <Button variant="outline" disabled>
+              Connexion (Bientôt)
+            </Button>
           </div>
 
           {/* Mobile Menu */}
@@ -243,59 +132,11 @@ export function Navbar() {
                 )}
 
                 {/* Mobile Auth */}
-                {!isAuthenticated ? (
-                  <div className="flex flex-col gap-2">
-                    <Button variant="outline" onClick={login} className="w-full">
-                      Connexion
-                    </Button>
-                    <Button className="w-full">Inscription</Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-3 rounded-lg border p-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={user?.avatar} alt={user?.name} />
-                        <AvatarFallback>
-                          <User className="h-5 w-5" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{user?.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {user?.email}
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" asChild className="justify-start">
-                      <Link href="/favorites">
-                        <Bookmark className="mr-2 h-4 w-4" />
-                        Mes Favoris
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" asChild className="justify-start">
-                      <Link href="/history">
-                        <History className="mr-2 h-4 w-4" />
-                        Historique
-                      </Link>
-                    </Button>
-                    {user?.role === "ADMIN" && (
-                      <Button variant="ghost" asChild className="justify-start">
-                        <Link href="/admin">
-                          <ShieldCheck className="mr-2 h-4 w-4" />
-                          Admin
-                        </Link>
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      onClick={logout}
-                      className="justify-start text-destructive hover:text-destructive"
-                    >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Déconnexion
-                    </Button>
-                  </div>
-                )}
+                <div className="flex flex-col gap-2">
+                  <Button variant="outline" disabled className="w-full">
+                    Connexion (Bientôt)
+                  </Button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>

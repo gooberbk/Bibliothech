@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { DownloadCloud, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { incrementDownload } from "@/actions/resource-actions"
@@ -12,7 +11,6 @@ type DownloadButtonProps = {
   fileUrl: string
   canDownload: boolean
   fileType: string
-  isAuthenticated: boolean
 }
 
 export function DownloadButton({
@@ -20,15 +18,10 @@ export function DownloadButton({
   fileUrl,
   canDownload,
   fileType,
-  isAuthenticated,
 }: DownloadButtonProps) {
   const [isPending, startTransition] = React.useTransition()
 
   const onDownload = () => {
-    if (!isAuthenticated) {
-      toast.error("Connectez-vous pour telecharger cette ressource.")
-      return
-    }
     if (!canDownload) {
       toast.error("Lien de telechargement invalide.")
       return
@@ -44,17 +37,6 @@ export function DownloadButton({
         toast.error(message)
       }
     })
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Button size="lg" asChild className="flex-1 gap-2 sm:flex-none">
-        <Link href="/login">
-          <DownloadCloud className="h-5 w-5" />
-          Se connecter pour telecharger
-        </Link>
-      </Button>
-    )
   }
 
   return (
