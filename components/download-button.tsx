@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { DownloadCloud, Loader2 } from "lucide-react"
-import { authClient } from "@/lib/auth/client"
+import { useAuth } from "@clerk/nextjs"
 import { toast } from "sonner"
 import { incrementDownload } from "@/actions/resource-actions"
 import { Button } from "@/components/ui/button"
@@ -20,20 +20,8 @@ export function DownloadButton({
   canDownload,
   fileType,
 }: DownloadButtonProps) {
-  const [isSignedIn, setIsSignedIn] = React.useState(false)
+  const { isSignedIn, isLoaded } = useAuth()
   const [isPending, startTransition] = React.useTransition()
-
-  React.useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data } = await authClient.getSession()
-        setIsSignedIn(!!data?.user)
-      } catch (error) {
-        setIsSignedIn(false)
-      }
-    }
-    checkSession()
-  }, [])
 
   const onDownload = () => {
     if (!isSignedIn) {
@@ -55,6 +43,15 @@ export function DownloadButton({
         toast.error(message)
       }
     })
+  }
+
+  if (!isLoaded) {
+    return (
+      <Button size="lg" variant="outline" disabled className="flex-1 gap-2 sm:flex-none">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        Chargement...
+      </Button>
+    )
   }
 
   if (!isSignedIn) {

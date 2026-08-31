@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Heart, Loader2 } from "lucide-react"
-import { authClient } from "@/lib/auth/client"
+import { useAuth } from "@clerk/nextjs"
 import { toast } from "sonner"
 import { toggleFavorite } from "@/actions/resource-actions"
 import { Button } from "@/components/ui/button"
@@ -16,21 +16,9 @@ export function FavoriteButton({
   resourceId,
   initialIsFavorite,
 }: FavoriteButtonProps) {
-  const [isSignedIn, setIsSignedIn] = React.useState(false)
+  const { isSignedIn, isLoaded } = useAuth()
   const [isFavorite, setIsFavorite] = React.useState(initialIsFavorite)
   const [isPending, startTransition] = React.useTransition()
-
-  React.useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data } = await authClient.getSession()
-        setIsSignedIn(!!data?.user)
-      } catch (error) {
-        setIsSignedIn(false)
-      }
-    }
-    checkSession()
-  }, [])
 
   const onToggle = () => {
     if (!isSignedIn) {
@@ -48,6 +36,14 @@ export function FavoriteButton({
         toast.error(message)
       }
     })
+  }
+
+  if (!isLoaded) {
+    return (
+      <Button size="lg" variant="outline" disabled>
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </Button>
+    )
   }
 
   if (!isSignedIn) {

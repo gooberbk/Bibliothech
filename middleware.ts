@@ -1,7 +1,7 @@
-import { authMiddleware } from '@clerk/nextjs/server'
+import { clerkMiddleware } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
-export default authMiddleware({
+export default clerkMiddleware({
   publicRoutes: ['/', '/sign-in', '/sign-up', '/book/:path*', '/api/webhooks/clerk'],
   ignoredRoutes: ['/api/webhooks/clerk'],
   afterAuth: async (auth, req) => {
