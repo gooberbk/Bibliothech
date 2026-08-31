@@ -28,3 +28,10 @@ export const documentTypes = [
   "Examen corrigé",
   "Cours",
 ]
+
+export const formats = [
+  "PDF",
+  "EPUB",
+  "DOCX",
+  "ZIP",
+]

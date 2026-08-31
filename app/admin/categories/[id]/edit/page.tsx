@@ -21,7 +21,8 @@ type Category = {
   }
 }
 
-export default function EditCategoryPage({ params }: { params: { id: string } }) {
+export default function EditCategoryPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params)
   const router = useRouter()
   const [isLoading, setIsLoading] = React.useState(true)
   const [isSaving, setIsSaving] = React.useState(false)
@@ -34,7 +35,10 @@ export default function EditCategoryPage({ params }: { params: { id: string } })
   const loadCategory = React.useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await getCategory(params.id)
+      const data = await getCategory(id)
+      if (!data) {
+        throw new Error("Catégorie introuvable")
+      }
       setCategory(data)
       setFormData({ name: data.name })
     } catch (error) {
@@ -44,7 +48,7 @@ export default function EditCategoryPage({ params }: { params: { id: string } })
     } finally {
       setIsLoading(false)
     }
-  }, [params.id, router])
+  }, [id, router])
 
   React.useEffect(() => {
     void loadCategory()
@@ -71,7 +75,7 @@ export default function EditCategoryPage({ params }: { params: { id: string } })
 
     try {
       await updateCategory({
-        id: params.id,
+        id,
         name: formData.name.trim(),
       })
 

@@ -1,6 +1,6 @@
 "use server"
 
-import { revalidatePath, revalidateTag } from "next/cache"
+import { revalidatePath } from "next/cache"
 import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
 import { syncClerkUser } from "@/lib/clerk-sync"
@@ -58,7 +58,6 @@ export const createCategory = async (data: CreateCategoryInput) => {
   })
 
   revalidatePath("/admin/categories")
-  revalidateTag("categories")
   return category
 }
 
@@ -118,7 +117,6 @@ export const updateCategory = async (data: UpdateCategoryInput) => {
 
   revalidatePath("/admin/categories")
   revalidatePath(`/admin/categories/${categoryId}`)
-  revalidateTag("categories")
   return category
 }
 
@@ -150,6 +148,5 @@ export const deleteCategory = async (id: string) => {
   })
 
   revalidatePath("/admin/categories")
-  revalidateTag("categories")
   return { success: true }
 }

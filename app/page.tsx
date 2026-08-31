@@ -8,7 +8,7 @@ import { getResourcesListCached } from "@/lib/catalog-cache"
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  let resources = []
+  let resources: any[] = []
   try {
     resources = await getResourcesListCached()
   } catch (error) {

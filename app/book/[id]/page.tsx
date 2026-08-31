@@ -38,7 +38,7 @@ export const dynamic = 'force-dynamic'
 export default async function BookDetailsPage({ params }: BookDetailsPageProps) {
   const { id } = await params
   let resource
-  let relatedResources = []
+  let relatedResources: any[] = []
   let isFavorite = false
 
   try {

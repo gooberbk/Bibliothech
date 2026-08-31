@@ -11,7 +11,7 @@ import { toast } from "sonner"
 
 type UserDetails = {
   id: string
-  clerkId: string
+  clerkId: string | null
   name: string | null
   email: string | null
   role: "USER" | "ADMIN"
@@ -29,7 +29,8 @@ type UserDetails = {
   }
 }
 
-export default function EditUserPage({ params }: { params: { id: string } }) {
+export default function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params)
   const [user, setUser] = React.useState<UserDetails | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [isUpdatingRole, setIsUpdatingRole] = React.useState(false)
@@ -37,7 +38,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const loadUser = React.useCallback(async () => {
     setIsLoading(true)
     try {
-      const data = await getUserDetails(params.id)
+      const data = await getUserDetails(id)
       setUser(data)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossible de charger l'utilisateur."
@@ -45,7 +46,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     } finally {
       setIsLoading(false)
     }
-  }, [params.id])
+  }, [id])
 
   React.useEffect(() => {
     void loadUser()

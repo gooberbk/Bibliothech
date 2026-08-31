@@ -12,7 +12,7 @@ export default async function TestAuthPage() {
           <div>
             <p>✅ Authenticated</p>
             <p>User ID: {userId}</p>
-            <p>Email: {sessionClaims?.email || "N/A"}</p>
+            <p>Email: {typeof (sessionClaims as any)?.email === "string" ? (sessionClaims as any).email : "N/A"}</p>
           </div>
         ) : (
           <p>❌ Not authenticated</p>

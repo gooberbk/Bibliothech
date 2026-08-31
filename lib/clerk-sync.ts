@@ -6,7 +6,7 @@ import { awardNewMemberBadge } from '@/lib/badges/awarding'
  * Sync Clerk user with database
  * This function creates or updates a user record when they sign in with Clerk
  */
-export async function syncClerkUser(clerkUserId: string, userData: {
+export async function syncClerkUser(clerkId: string, userData: {
   email?: string
   name?: string
   image?: string
@@ -55,7 +55,7 @@ export async function syncClerkUser(clerkUserId: string, userData: {
 /**
  * Get user by Clerk ID
  */
-export async function getUserByClerkId(clerkUserId: string) {
+export async function getUserByClerkId(clerkId: string) {
   return db.user.findUnique({
     where: { clerkId },
   })

@@ -88,7 +88,7 @@ export async function updateUserRole(formData: FormData) {
 
   const currentUser = await db.user.findUnique({
     where: { clerkId: userId },
-    select: { role: true },
+    select: { id: true, role: true },
   })
 
   if (!currentUser || currentUser.role !== "ADMIN") {
