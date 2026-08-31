@@ -1,33 +1,100 @@
-import { redirect } from 'next/navigation'
-import { auth } from '@clerk/nextjs/server'
-import { db } from '@/lib/db'
-import { syncClerkUser } from '@/lib/clerk-sync'
-import { Navbar } from '@/components/navbar'
-import { Footer } from '@/components/footer'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import { Settings, User, Shield, Bell } from 'lucide-react'
-import Link from 'next/link'
+"use client"
 
-export const dynamic = 'force-dynamic'
+import * as React from "react"
+import Link from "next/link"
+import { Settings, User, Shield, Bell, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
+import { updatePrivacySettings, updateNotificationSettings } from "@/actions/profile-actions"
+import { toast } from "sonner"
 
-export default async function SettingsPage() {
-  const { userId } = await auth()
-  if (!userId) {
-    redirect('/sign-in')
-  }
-
-  // Sync Clerk user with database
-  await syncClerkUser(userId, {})
-
-  const user = await db.user.findUnique({
-    where: { clerkId: userId },
+export default function SettingsPage() {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [settings, setSettings] = React.useState({
+    profileVisible: true,
+    activityVisible: true,
+    emailNotifications: true,
+    updateNotifications: true,
   })
 
-  if (!user) {
-    redirect('/sign-in')
+  const loadSettings = React.useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/profile")
+      if (!response.ok) throw new Error("Impossible de charger les paramètres")
+      const data = await response.json()
+      setSettings({
+        profileVisible: data.profileVisible ?? true,
+        activityVisible: data.activityVisible ?? true,
+        emailNotifications: true, // Default values for notification settings
+        updateNotifications: true,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Une erreur est survenue."
+      toast.error(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    void loadSettings()
+  }, [loadSettings])
+
+  const handlePrivacyChange = async (field: "profileVisible" | "activityVisible", value: boolean) => {
+    setIsSaving(true)
+    try {
+      await updatePrivacySettings({
+        profileVisible: field === "profileVisible" ? value : settings.profileVisible,
+        activityVisible: field === "activityVisible" ? value : settings.activityVisible,
+      })
+      setSettings({ ...settings, [field]: value })
+      toast.success("Paramètres de confidentialité mis à jour")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Échec de la mise à jour."
+      toast.error(message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleNotificationChange = async (field: "emailNotifications" | "updateNotifications", value: boolean) => {
+    setIsSaving(true)
+    try {
+      await updateNotificationSettings({
+        emailNotifications: field === "emailNotifications" ? value : settings.emailNotifications,
+        updateNotifications: field === "updateNotifications" ? value : settings.updateNotifications,
+      })
+      setSettings({ ...settings, [field]: value })
+      toast.success("Paramètres de notification mis à jour")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Échec de la mise à jour."
+      toast.error(message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold tracking-tight">Paramètres</h1>
+              <p className="mt-1 text-muted-foreground">Chargement...</p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
   return (
@@ -54,19 +121,15 @@ export default async function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Nom</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {user.name || 'Non renseigné'}
-                  </p>
+                  <Label>Modifier le profil</Label>
                   <Button variant="link" className="p-0 h-auto mt-1" asChild>
-                    <Link href="https://accounts.clerk.com/user" target="_blank">
-                      Modifier dans Clerk
+                    <Link href="/profile/edit">
+                      Modifier ma bio, liens sociaux et informations académiques
                     </Link>
                   </Button>
                 </div>
                 <div>
-                  <Label htmlFor="email">Email</Label>
-                  <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
+                  <Label>Nom et Email</Label>
                   <Button variant="link" className="p-0 h-auto mt-1" asChild>
                     <Link href="https://accounts.clerk.com/user" target="_blank">
                       Modifier dans Clerk
@@ -92,7 +155,12 @@ export default async function SettingsPage() {
                       Rendre votre profil visible par les autres utilisateurs
                     </p>
                   </div>
-                  <Switch id="profile-visible" defaultChecked={user.profileVisible} />
+                  <Switch
+                    id="profile-visible"
+                    checked={settings.profileVisible}
+                    onCheckedChange={(checked) => handlePrivacyChange("profileVisible", checked)}
+                    disabled={isSaving}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -101,7 +169,12 @@ export default async function SettingsPage() {
                       Afficher votre activité (favoris, téléchargements)
                     </p>
                   </div>
-                  <Switch id="activity-visible" defaultChecked={user.activityVisible} />
+                  <Switch
+                    id="activity-visible"
+                    checked={settings.activityVisible}
+                    onCheckedChange={(checked) => handlePrivacyChange("activityVisible", checked)}
+                    disabled={isSaving}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -156,7 +229,12 @@ export default async function SettingsPage() {
                       Recevoir des notifications par email
                     </p>
                   </div>
-                  <Switch id="email-notifications" defaultChecked />
+                  <Switch
+                    id="email-notifications"
+                    checked={settings.emailNotifications}
+                    onCheckedChange={(checked) => handleNotificationChange("emailNotifications", checked)}
+                    disabled={isSaving}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -165,7 +243,12 @@ export default async function SettingsPage() {
                       Être notifié des nouvelles ressources
                     </p>
                   </div>
-                  <Switch id="update-notifications" defaultChecked />
+                  <Switch
+                    id="update-notifications"
+                    checked={settings.updateNotifications}
+                    onCheckedChange={(checked) => handleNotificationChange("updateNotifications", checked)}
+                    disabled={isSaving}
+                  />
                 </div>
               </CardContent>
             </Card>

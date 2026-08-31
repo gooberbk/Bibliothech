@@ -4,13 +4,14 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  Library,
   LayoutDashboard,
   BookOpen,
   Users,
   Settings,
   ChevronRight,
   Home,
+  Folder,
+  Library,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -26,6 +27,7 @@ import {
 const navigation = [
   { name: "Vue d'ensemble", href: "/admin", icon: LayoutDashboard },
   { name: "Gestion des Livres", href: "/admin/books", icon: BookOpen },
+  { name: "Catégories", href: "/admin/categories", icon: Folder },
   { name: "Utilisateurs", href: "/admin/users", icon: Users },
   { name: "Paramètres", href: "/admin/settings", icon: Settings },
 ]
@@ -33,9 +35,12 @@ const navigation = [
 function getBreadcrumbTitle(pathname: string): string {
   if (pathname === "/admin") return "Vue d'ensemble"
   if (pathname === "/admin/books") return "Gestion des Livres"
+  if (pathname === "/admin/categories") return "Catégories"
   if (pathname === "/admin/users") return "Utilisateurs"
   if (pathname === "/admin/settings") return "Paramètres"
   if (pathname.startsWith("/admin/books/new")) return "Nouvelle Ressource"
+  if (pathname.startsWith("/admin/categories/new")) return "Nouvelle Catégorie"
+  if (pathname.startsWith("/admin/categories/")) return "Modifier Catégorie"
   return "Admin"
 }
 

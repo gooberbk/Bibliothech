@@ -43,6 +43,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { deleteResource, getAdminResources } from "@/actions/resource-actions"
+import { getCategories } from "@/actions/category-actions"
+import { categoryStyles } from "@/lib/data"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -58,15 +60,8 @@ type AdminBook = {
   createdAt: string
 }
 
-const categoryStyles: Record<string, string> = {
-  "Architecture": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200",
-  "Mathématiques": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200",
-  "Probabilités": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200",
-  "Physique": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200",
-  "Électromagnétisme": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200",
-  "Algorithmique": "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200",
-  "Base de données": "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 border-cyan-200",
-  "Systèmes d'Exploitation": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border-rose-200",
+const getCategoryStyle = (category: string): string => {
+  return categoryStyles[category as keyof typeof categoryStyles] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400 border-gray-200"
 }
 
 export default function AdminBooksPage() {
@@ -298,7 +293,7 @@ export default function AdminBooksPage() {
                     variant="outline"
                     className={cn(
                       "text-xs",
-                      categoryStyles[book.category] || ""
+                      getCategoryStyle(book.category)
                     )}
                   >
                     {book.category}

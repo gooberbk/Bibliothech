@@ -32,9 +32,20 @@ model User {
   updatedAt     DateTime  @updatedAt
   lastSyncAt    DateTime?
 
-  favorites Favorite[]
-  downloads Download[]
+  favorites  Favorite[]
+  downloads  Download[]
   activities UserActivity[]
+  badges     UserBadge[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  resources Resource[]
 }
 
 model Resource {
@@ -43,6 +54,7 @@ model Resource {
   author      String
   description String?  @db.Text
   category    String
+  categoryId  String?
   type        String
   pageCount   Int
   fileSizeMb  Float
@@ -57,9 +69,11 @@ model Resource {
 
   favoritedBy  Favorite[]
   downloadedBy Download[]
+  categoryRelation Category? @relation(fields: [categoryId], references: [id])
 
   @@index([category])
   @@index([type])
+  @@index([categoryId])
 }
 
 model Favorite {
@@ -103,4 +117,30 @@ model UserActivity {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+model Badge {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String
+  icon           String   // Emoji or icon name
+  requirementType String  // "downloads", "favorites", "logins", "views"
+  requirementValue Int    // Number required to earn badge
+  createdAt      DateTime @default(now())
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
 }

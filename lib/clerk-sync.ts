@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { auth } from '@clerk/nextjs/server'
+import { awardNewMemberBadge } from '@/lib/badges/awarding'
 
 /**
  * Sync Clerk user with database
@@ -39,6 +40,9 @@ export async function syncClerkUser(clerkUserId: string, userData: {
           lastSyncAt: new Date(),
         },
       })
+
+      // Award new member badge
+      await awardNewMemberBadge(user.id)
     }
 
     return user

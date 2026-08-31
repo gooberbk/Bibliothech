@@ -2,12 +2,13 @@ import { redirect } from 'next/navigation'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
 import { syncClerkUser } from '@/lib/clerk-sync'
+import { getUserBadges } from '@/lib/badges/awarding'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Badge as UIBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { User, Download, Heart, Settings, Activity } from 'lucide-react'
+import { User, Download, Heart, Settings, Activity, Award } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -45,6 +46,8 @@ export default async function ProfilePage() {
     redirect('/sign-in')
   }
 
+  const badges = await getUserBadges(user.id)
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
@@ -60,12 +63,19 @@ export default async function ProfilePage() {
                 </h1>
                 <p className="mt-1 text-muted-foreground">{user.email}</p>
               </div>
-              <Button asChild>
-                <Link href="/settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Paramètres
-                </Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" asChild>
+                  <Link href="/profile/edit">
+                    Modifier le profil
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Paramètres
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -90,10 +100,16 @@ export default async function ProfilePage() {
                   <p className="text-sm text-muted-foreground">{user.email}</p>
                 </div>
                 <div>
+                  <p className="text-sm font-medium">Bio</p>
+                  <p className="text-sm text-muted-foreground">
+                    {user.bio || 'Non renseignée'}
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm font-medium">Rôle</p>
-                  <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
+                  <UIBadge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
                     {user.role === 'ADMIN' ? 'Administrateur' : 'Utilisateur'}
-                  </Badge>
+                  </UIBadge>
                 </div>
                 <div>
                   <p className="text-sm font-medium">Membre depuis</p>
@@ -109,6 +125,44 @@ export default async function ProfilePage() {
                     </Link>
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Badges Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="h-5 w-5" />
+                  Badges ({badges.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {badges.length === 0 ? (
+                  <div className="text-center py-4">
+                    <Award className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Aucun badge obtenu pour le moment
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Continuez à utiliser la plateforme pour en débloquer !
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {badges.map((badge) => (
+                      <div
+                        key={badge.id}
+                        className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
+                      >
+                        <span className="text-2xl">{badge.icon}</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{badge.name}</p>
+                          <p className="text-xs text-muted-foreground">{badge.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

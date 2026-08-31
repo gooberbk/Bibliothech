@@ -19,10 +19,17 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { categories, documentTypes } from "@/lib/data"
+import { documentTypes } from "@/lib/data"
+import { getCategories } from "@/actions/category-actions"
 import { createResource } from "@/actions/resource-actions"
 import { useUploadThing } from "@/lib/uploadthing"
 import { toast } from "sonner"
+
+type Category = {
+  id: string
+  name: string
+  slug: string
+}
 
 type UploadedFileInfo = {
   url: string
@@ -34,6 +41,8 @@ type UploadedFileInfo = {
 export default function NewBookPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = React.useState(false)
+  const [categories, setCategories] = React.useState<Category[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = React.useState(true)
   const [coverPreview, setCoverPreview] = React.useState<string | null>(null)
   const [coverFileName, setCoverFileName] = React.useState<string | null>(null)
   const [coverUploadProgress, setCoverUploadProgress] = React.useState(0)
@@ -56,6 +65,23 @@ export default function NewBookPage() {
   })
 
   const [errors, setErrors] = React.useState<Record<string, string>>({})
+
+  const loadCategories = React.useCallback(async () => {
+    setIsLoadingCategories(true)
+    try {
+      const data = await getCategories()
+      setCategories(data)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Impossible de charger les catégories."
+      toast.error(message)
+    } finally {
+      setIsLoadingCategories(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    void loadCategories()
+  }, [loadCategories])
 
   const { startUpload: startCoverUpload } = useUploadThing("coverImage", {
     uploadProgressGranularity: "fine",
@@ -357,11 +383,21 @@ export default function NewBookPage() {
                         <SelectValue placeholder="Sélectionnez un module" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                        {isLoadingCategories ? (
+                          <SelectItem value="" disabled>
+                            Chargement...
                           </SelectItem>
-                        ))}
+                        ) : categories.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            Aucune catégorie disponible
+                          </SelectItem>
+                        ) : (
+                          categories.map((category) => (
+                            <SelectItem key={category.id} value={category.name}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     {errors.category && (

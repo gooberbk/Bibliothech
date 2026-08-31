@@ -7,6 +7,7 @@ import { db } from "@/lib/db"
 import { downloadRateLimit } from "@/lib/rate-limit"
 import { syncClerkUser } from "@/lib/clerk-sync"
 import { trackUserActivity } from "@/lib/activity/tracker"
+import { checkAndAwardBadges } from "@/lib/badges/awarding"
 import {
   DeleteResourceSchema,
   ResourceIdSchema,
@@ -42,8 +43,20 @@ export const createResource = async (data: CreateResourceInput) => {
   await ensureAdmin()
   const payload = ResourceSchema.parse(data)
 
+  // Find category by name to get categoryId
+  const category = await db.category.findUnique({
+    where: { name: payload.category },
+  })
+
+  if (!category) {
+    throw new Error("Catégorie introuvable")
+  }
+
   const resource = await db.resource.create({
-    data: payload,
+    data: {
+      ...payload,
+      categoryId: category.id,
+    },
   })
 
   revalidatePath("/", "page")
@@ -115,7 +128,7 @@ export const toggleFavorite = async (resourceId: string) => {
 
   if (existing) {
     await db.favorite.delete({ where: { id: existing.id } })
-    
+
     // Track activity
     await trackUserActivity({
       userId: user.id,
@@ -123,7 +136,7 @@ export const toggleFavorite = async (resourceId: string) => {
       entityId: parsedResourceId,
       entityType: 'resource',
     })
-    
+
     return { isFavorite: false }
   }
 
@@ -141,6 +154,9 @@ export const toggleFavorite = async (resourceId: string) => {
     entityId: parsedResourceId,
     entityType: 'resource',
   })
+
+  // Check for badge awards
+  await checkAndAwardBadges(user.id)
 
   return { isFavorite: true }
 }
@@ -189,5 +205,8 @@ export const incrementDownload = async (resourceId: string) => {
       entityId: parsedResourceId,
       entityType: 'resource',
     })
+
+    // Check for badge awards
+    await checkAndAwardBadges(dbUserId)
   }
 }
