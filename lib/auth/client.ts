@@ -1,6 +1,14 @@
-'use client';
-import { createAuthClient } from '@neondatabase/auth/next';
+'use client'
+import { useAuth, useUser } from '@clerk/nextjs'
 
-export const authClient = createAuthClient({
-  baseUrl: process.env.NEXT_PUBLIC_NEON_AUTH_BASE_URL!,
-});
+export function useClerkAuth() {
+  const { isLoaded, isSignedIn, userId } = useAuth()
+  const { user } = useUser()
+
+  return {
+    isLoaded,
+    isSignedIn,
+    userId,
+    user,
+  }
+}

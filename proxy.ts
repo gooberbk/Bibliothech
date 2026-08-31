@@ -1,6 +1,17 @@
 import { auth } from '@/lib/auth/server';
 
-export default auth.middleware();
+export default auth.middleware((auth) => {
+  // Allow public access to auth routes
+  if (auth.request.nextUrl.pathname.startsWith('/sign-in') || 
+      auth.request.nextUrl.pathname.startsWith('/sign-up') ||
+      auth.request.nextUrl.pathname.startsWith('/api/auth') ||
+      auth.request.nextUrl.pathname === '/') {
+    return
+  }
+  return auth.protect({
+    redirectTo: '/sign-in'
+  })
+});
 
 export const config = {
   matcher: [

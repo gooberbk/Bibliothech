@@ -1,8 +1,22 @@
-import { createNeonAuth } from '@neondatabase/auth/next/server';
+import { auth } from '@clerk/nextjs/server'
 
-export const auth = createNeonAuth({
-  baseUrl: process.env.NEON_AUTH_BASE_URL!,
-  cookies: {
-    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
-  },
-});
+export async function getCurrentUser() {
+  const { userId } = await auth()
+  return userId
+}
+
+export async function requireAuth() {
+  const { userId } = await auth()
+  if (!userId) {
+    throw new Error('Unauthorized')
+  }
+  return userId
+}
+
+export async function getCurrentUserDetails() {
+  const { userId, sessionClaims } = await auth()
+  return {
+    userId,
+    sessionClaims,
+  }
+}

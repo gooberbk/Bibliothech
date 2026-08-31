@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth/server"
+import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
+import { syncClerkUser } from "@/lib/clerk-sync"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,13 +9,16 @@ import { ArrowLeft, Shield, User, Users } from "lucide-react"
 import Link from "next/link"
 
 export default async function AdminUsersPage() {
-  const session = await auth.getSession()
-  if (!session?.user) {
+  const { userId } = await auth()
+  if (!userId) {
     redirect("/sign-in")
   }
 
+  // Sync Clerk user with database
+  await syncClerkUser(userId, {})
+
   const currentUser = await db.user.findUnique({
-    where: { neonId: session.user.id },
+    where: { clerkId: userId },
     select: { role: true },
   })
 

@@ -2,9 +2,11 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 import { UTApi } from "uploadthing/server"
-import { auth } from "@/lib/auth/server"
+import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
 import { downloadRateLimit } from "@/lib/rate-limit"
+import { syncClerkUser } from "@/lib/clerk-sync"
+import { trackUserActivity } from "@/lib/activity/tracker"
 import {
   DeleteResourceSchema,
   ResourceIdSchema,
@@ -15,14 +17,17 @@ import {
 const utapi = new UTApi()
 
 const ensureAdmin = async () => {
-  const session = await auth.getSession()
-  if (!session?.user) {
+  const { userId } = await auth()
+  if (!userId) {
     throw new Error("Connexion requise")
   }
   
-  // Find user by neonId and check role
+  // Sync Clerk user with database
+  await syncClerkUser(userId, {})
+  
+  // Find user by clerkId and check role
   const user = await db.user.findUnique({
-    where: { neonId: session.user.id },
+    where: { clerkId: userId },
     select: { id: true, role: true },
   })
   
@@ -78,16 +83,19 @@ export const deleteResource = async (id: string) => {
 }
 
 export const toggleFavorite = async (resourceId: string) => {
-  const session = await auth.getSession()
-  if (!session?.user) {
+  const { userId } = await auth()
+  if (!userId) {
     throw new Error("Connexion requise")
   }
 
   const { resourceId: parsedResourceId } = ResourceIdSchema.parse({ resourceId })
 
-  // Find user by neonId
+  // Sync Clerk user with database
+  await syncClerkUser(userId, {})
+
+  // Find user by clerkId
   const user = await db.user.findUnique({
-    where: { neonId: session.user.id },
+    where: { clerkId: userId },
     select: { id: true },
   })
 
@@ -107,6 +115,15 @@ export const toggleFavorite = async (resourceId: string) => {
 
   if (existing) {
     await db.favorite.delete({ where: { id: existing.id } })
+    
+    // Track activity
+    await trackUserActivity({
+      userId: user.id,
+      action: 'unfavorite',
+      entityId: parsedResourceId,
+      entityType: 'resource',
+    })
+    
     return { isFavorite: false }
   }
 
@@ -117,14 +134,21 @@ export const toggleFavorite = async (resourceId: string) => {
     },
   })
 
+  // Track activity
+  await trackUserActivity({
+    userId: user.id,
+    action: 'favorite',
+    entityId: parsedResourceId,
+    entityType: 'resource',
+  })
+
   return { isFavorite: true }
 }
 
 export const incrementDownload = async (resourceId: string) => {
-  const session = await auth.getSession()
+  const { userId } = await auth()
   const { resourceId: parsedResourceId } = ResourceIdSchema.parse({ resourceId })
 
-  const userId = session?.user?.id
   const identifier = userId ?? `guest:${parsedResourceId}`
   const { success } = await downloadRateLimit.limit(identifier)
 
@@ -134,8 +158,11 @@ export const incrementDownload = async (resourceId: string) => {
 
   let dbUserId: string | null = null
   if (userId) {
+    // Sync Clerk user with database
+    await syncClerkUser(userId, {})
+    
     const user = await db.user.findUnique({
-      where: { neonId: userId },
+      where: { clerkId: userId },
       select: { id: true },
     })
     dbUserId = user?.id ?? null
@@ -153,4 +180,14 @@ export const incrementDownload = async (resourceId: string) => {
       data: { downloadCount: { increment: 1 } },
     }),
   ])
+
+  // Track activity if user is logged in
+  if (dbUserId) {
+    await trackUserActivity({
+      userId: dbUserId,
+      action: 'download',
+      entityId: parsedResourceId,
+      entityType: 'resource',
+    })
+  }
 }

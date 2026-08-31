@@ -1,5 +1,9 @@
-import { redirect } from "next/navigation"
+import { SignUp } from '@clerk/nextjs'
 
 export default function SignUpPage() {
-  redirect("/api/auth/sign-up")
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <SignUp />
+    </div>
+  )
 }
