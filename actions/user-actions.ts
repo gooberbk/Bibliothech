@@ -1,31 +1,15 @@
 "use server"
 
-import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
 import { revalidatePath } from "next/cache"
-import { syncClerkUser } from "@/lib/clerk-sync"
 import { trackUserActivity } from "@/lib/activity/tracker"
 import { awardNewMemberBadge, checkAndAwardBadges } from "@/lib/badges/awarding"
+import { auth } from "@clerk/nextjs/server"
+import { syncClerkUser } from "@/lib/clerk-sync"
+import { ensureAdminSession } from "@/lib/admin-session"
 
 const ensureAdmin = async () => {
-  const { userId } = await auth()
-  if (!userId) {
-    throw new Error("Connexion requise")
-  }
-
-  // Sync Clerk user with database
-  await syncClerkUser(userId, {})
-
-  const user = await db.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true, role: true },
-  })
-
-  if (!user || user.role !== "ADMIN") {
-    throw new Error("Accès refusé")
-  }
-
-  return user.id
+  return ensureAdminSession()
 }
 
 export async function getAdminUsers() {
@@ -78,22 +62,7 @@ export async function getUserDetails(userId: string) {
 }
 
 export async function updateUserRole(formData: FormData) {
-  const { userId } = await auth()
-  if (!userId) {
-    throw new Error("Connexion requise")
-  }
-
-  // Sync Clerk user with database
-  await syncClerkUser(userId, {})
-
-  const currentUser = await db.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true, role: true },
-  })
-
-  if (!currentUser || currentUser.role !== "ADMIN") {
-    throw new Error("Accès refusé")
-  }
+  await ensureAdmin()
 
   const targetUserId = formData.get("userId") as string
   const newRole = formData.get("newRole") as "USER" | "ADMIN"
@@ -116,15 +85,6 @@ export async function updateUserRole(formData: FormData) {
   await db.user.update({
     where: { id: targetUserId },
     data: { role: newRole },
-  })
-
-  // Track activity
-  await trackUserActivity({
-    userId: currentUser.id,
-    action: 'role_change',
-    entityId: targetUserId,
-    entityType: 'user',
-    metadata: { newRole },
   })
 
   revalidatePath("/admin/users")

@@ -1,9 +1,8 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
-import { syncClerkUser } from "@/lib/clerk-sync"
+import { ensureAdminSession } from "@/lib/admin-session"
 import { z } from "zod"
 
 const CategorySchema = z.object({
@@ -18,24 +17,7 @@ type CreateCategoryInput = z.infer<typeof CategorySchema>
 type UpdateCategoryInput = z.infer<typeof CategorySchema> & { id: string }
 
 const ensureAdmin = async () => {
-  const { userId } = await auth()
-  if (!userId) {
-    throw new Error("Connexion requise")
-  }
-
-  // Sync Clerk user with database
-  await syncClerkUser(userId, {})
-
-  const user = await db.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true, role: true },
-  })
-
-  if (!user || user.role !== "ADMIN") {
-    throw new Error("Accès refusé")
-  }
-
-  return user.id
+  return ensureAdminSession()
 }
 
 export const createCategory = async (data: CreateCategoryInput) => {

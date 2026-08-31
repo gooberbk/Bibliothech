@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { UTApi } from "uploadthing/server"
 import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
+import { ensureAdminSession } from "@/lib/admin-session"
 import { downloadRateLimit } from "@/lib/rate-limit"
 import { syncClerkUser } from "@/lib/clerk-sync"
 import { trackUserActivity } from "@/lib/activity/tracker"
@@ -18,25 +19,7 @@ import {
 const utapi = new UTApi()
 
 const ensureAdmin = async () => {
-  const { userId } = await auth()
-  if (!userId) {
-    throw new Error("Connexion requise")
-  }
-  
-  // Sync Clerk user with database
-  await syncClerkUser(userId, {})
-  
-  // Find user by clerkId and check role
-  const user = await db.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true, role: true },
-  })
-  
-  if (!user || user.role !== "ADMIN") {
-    throw new Error("Accès refusé")
-  }
-  
-  return user.id
+  return ensureAdminSession()
 }
 
 export const createResource = async (data: CreateResourceInput) => {

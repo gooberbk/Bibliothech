@@ -1,63 +1,50 @@
 import { db } from '@/lib/db'
+import { hashAdminPassword } from '@/lib/admin-password'
 
 async function seedAdmin() {
-  const adminClerkId = process.env.ADMIN_CLERK_ID
-  const adminEmail = process.env.ADMIN_EMAIL
+  const adminUsername = process.env.ADMIN_USERNAME
+  const adminPassword = process.env.ADMIN_PASSWORD
   const adminName = process.env.ADMIN_NAME
 
-  if (!adminClerkId || !adminEmail) {
-    console.log('Usage: ADMIN_CLERK_ID=user_xxx ADMIN_EMAIL=user@example.com ADMIN_NAME="Jane Doe" npx tsx scripts/seed-admin.ts')
+  if (!adminUsername || !adminPassword) {
+    console.log('Usage: ADMIN_USERNAME=admin ADMIN_PASSWORD="change-me-strong" ADMIN_NAME="Jane Doe" npx tsx scripts/seed-admin.ts')
     process.exit(1)
   }
 
   try {
-    const existingAdmin = await db.user.findFirst({
-      where: {
-        OR: [{ clerkId: adminClerkId }, { email: adminEmail }],
-      },
+    const username = adminUsername.trim().toLowerCase()
+    const existingAdmin = await db.adminAccount.findUnique({
+      where: { username },
     })
 
     if (existingAdmin) {
-      if (existingAdmin.role === 'ADMIN') {
-        console.log('✅ Admin user already exists and is ADMIN')
-        return
-      }
-      await db.user.update({
+      await db.adminAccount.update({
         where: { id: existingAdmin.id },
         data: {
-          clerkId: adminClerkId,
-          email: adminEmail,
           name: adminName ?? existingAdmin.name,
-          role: 'ADMIN',
-          profileVisible: true,
-          activityVisible: true,
-          lastSyncAt: new Date(),
+          passwordHash: hashAdminPassword(adminPassword),
+          active: true,
         },
       })
-      console.log('✅ User updated to ADMIN')
+      console.log('✅ Admin account updated')
       return
     }
 
-    const admin = await db.user.create({
+    const admin = await db.adminAccount.create({
       data: {
+        username,
         name: adminName,
-        email: adminEmail,
-        clerkId: adminClerkId,
-        role: 'ADMIN',
-        profileVisible: true,
-        activityVisible: true,
-        lastSyncAt: new Date(),
+        passwordHash: hashAdminPassword(adminPassword),
       },
     })
 
-    console.log('✅ Admin user created successfully')
-    console.log(`📧 Email: ${admin.email}`)
-    console.log(`👤 Name: ${admin.name}`)
+    console.log('✅ Admin account created successfully')
+    console.log(`👤 Username: ${admin.username}`)
   } catch (error) {
-    console.error('❌ Error seeding admin user:', error)
+    console.error('❌ Error seeding admin account:', error)
   } finally {
     await db.$disconnect()
   }
 }
 
-seedAdmin()
+void seedAdmin()
