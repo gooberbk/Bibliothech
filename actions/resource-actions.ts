@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 import { UTApi } from "uploadthing/server"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth/server"
 import { db } from "@/lib/db"
 import { downloadRateLimit } from "@/lib/rate-limit"
 import {
@@ -15,14 +15,14 @@ import {
 const utapi = new UTApi()
 
 const ensureAdmin = async () => {
-  const { userId } = await auth()
-  if (!userId) {
+  const session = await auth.getSession()
+  if (!session?.user) {
     throw new Error("Connexion requise")
   }
   
-  // Find user by clerkId and check role
+  // Find user by neonId and check role
   const user = await db.user.findUnique({
-    where: { clerkId: userId },
+    where: { neonId: session.user.id },
     select: { id: true, role: true },
   })
   
@@ -78,16 +78,16 @@ export const deleteResource = async (id: string) => {
 }
 
 export const toggleFavorite = async (resourceId: string) => {
-  const { userId } = await auth()
-  if (!userId) {
+  const session = await auth.getSession()
+  if (!session?.user) {
     throw new Error("Connexion requise")
   }
 
   const { resourceId: parsedResourceId } = ResourceIdSchema.parse({ resourceId })
 
-  // Find user by clerkId
+  // Find user by neonId
   const user = await db.user.findUnique({
-    where: { clerkId: userId },
+    where: { neonId: session.user.id },
     select: { id: true },
   })
 
@@ -121,9 +121,10 @@ export const toggleFavorite = async (resourceId: string) => {
 }
 
 export const incrementDownload = async (resourceId: string) => {
-  const { userId } = await auth()
+  const session = await auth.getSession()
   const { resourceId: parsedResourceId } = ResourceIdSchema.parse({ resourceId })
 
+  const userId = session?.user?.id
   const identifier = userId ?? `guest:${parsedResourceId}`
   const { success } = await downloadRateLimit.limit(identifier)
 
@@ -134,7 +135,7 @@ export const incrementDownload = async (resourceId: string) => {
   let dbUserId: string | null = null
   if (userId) {
     const user = await db.user.findUnique({
-      where: { clerkId: userId },
+      where: { neonId: userId },
       select: { id: true },
     })
     dbUserId = user?.id ?? null

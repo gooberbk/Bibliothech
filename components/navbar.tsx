@@ -3,7 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
-import { SignInButton, SignUpButton, UserButton } from "@clerk/nextjs"
 import {
   Library,
   Search,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { AuthButtons } from "@/components/auth-ui"
 import {
   Sheet,
   SheetContent,
@@ -83,15 +83,7 @@ export function Navbar() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex md:items-center md:gap-2">
-            <div className="flex items-center gap-2">
-              <SignInButton mode="modal">
-                <Button variant="outline">Connexion</Button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <Button>Inscription</Button>
-              </SignUpButton>
-              <UserButton afterSignOutUrl="/" />
-            </div>
+            <AuthButtons />
           </div>
 
           {/* Mobile Menu */}
@@ -140,19 +132,7 @@ export function Navbar() {
 
                 {/* Mobile Auth */}
                 <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <SignInButton mode="modal">
-                      <Button variant="outline" className="w-full">Connexion</Button>
-                    </SignInButton>
-                    <SignUpButton mode="modal">
-                      <Button className="w-full">Inscription</Button>
-                    </SignUpButton>
-                  </div>
-                  <UserButton afterSignOutUrl="/" appearance={{
-                    elements: {
-                      userButtonAvatarBox: "w-full"
-                    }
-                  }} />
+                  <AuthButtons />
                 </div>
               </div>
             </SheetContent>

@@ -24,7 +24,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth/server"
 import { db } from "@/lib/db"
 import { isSecureUploadthingUrl } from "@/lib/uploadthing-security"
 
@@ -41,12 +41,12 @@ export default async function BookDetailsPage({ params }: BookDetailsPageProps) 
   let isFavorite = false
 
   try {
-    const clerkUserId = (await auth())?.userId
+    const session = await auth.getSession()
     let dbUserId: string | null = null
     
-    if (clerkUserId) {
+    if (session?.user?.id) {
       const user = await db.user.findUnique({
-        where: { clerkId: clerkUserId },
+        where: { neonId: session.user.id },
         select: { id: true },
       })
       dbUserId = user?.id ?? null
