@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
+import { SignInButton, SignUpButton, UserButton } from "@clerk/nextjs"
 import {
   Library,
   Search,
@@ -82,9 +83,15 @@ export function Navbar() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex md:items-center md:gap-2">
-            <Button variant="outline" disabled>
-              Connexion (Bientôt)
-            </Button>
+            <div className="flex items-center gap-2">
+              <SignInButton mode="modal">
+                <Button variant="outline">Connexion</Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button>Inscription</Button>
+              </SignUpButton>
+              <UserButton afterSignOutUrl="/" />
+            </div>
           </div>
 
           {/* Mobile Menu */}
@@ -133,9 +140,19 @@ export function Navbar() {
 
                 {/* Mobile Auth */}
                 <div className="flex flex-col gap-2">
-                  <Button variant="outline" disabled className="w-full">
-                    Connexion (Bientôt)
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <SignInButton mode="modal">
+                      <Button variant="outline" className="w-full">Connexion</Button>
+                    </SignInButton>
+                    <SignUpButton mode="modal">
+                      <Button className="w-full">Inscription</Button>
+                    </SignUpButton>
+                  </div>
+                  <UserButton afterSignOutUrl="/" appearance={{
+                    elements: {
+                      userButtonAvatarBox: "w-full"
+                    }
+                  }} />
                 </div>
               </div>
             </SheetContent>

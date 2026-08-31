@@ -24,6 +24,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
 import { isSecureUploadthingUrl } from "@/lib/uploadthing-security"
 
@@ -37,13 +38,34 @@ export default async function BookDetailsPage({ params }: BookDetailsPageProps) 
   const { id } = await params
   let resource
   let relatedResources = []
+  let isFavorite = false
 
   try {
+    const clerkUserId = (await auth())?.userId
+    let dbUserId: string | null = null
+    
+    if (clerkUserId) {
+      const user = await db.user.findUnique({
+        where: { clerkId: clerkUserId },
+        select: { id: true },
+      })
+      dbUserId = user?.id ?? null
+    }
+    
     resource = await db.resource.findUnique({
       where: { id },
+      include: {
+        favoritedBy: dbUserId
+          ? {
+              where: { userId: dbUserId },
+              select: { id: true },
+            }
+          : false,
+      },
     })
 
     if (resource) {
+      isFavorite = Boolean(resource.favoritedBy?.length)
       relatedResources = await db.resource.findMany({
         where: {
           id: { not: resource.id },

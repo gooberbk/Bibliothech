@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { DownloadCloud, Loader2 } from "lucide-react"
+import { useAuth } from "@clerk/nextjs"
 import { toast } from "sonner"
 import { incrementDownload } from "@/actions/resource-actions"
 import { Button } from "@/components/ui/button"
@@ -19,9 +20,14 @@ export function DownloadButton({
   canDownload,
   fileType,
 }: DownloadButtonProps) {
+  const { isSignedIn } = useAuth()
   const [isPending, startTransition] = React.useTransition()
 
   const onDownload = () => {
+    if (!isSignedIn) {
+      toast.error("Connectez-vous pour telecharger cette ressource.")
+      return
+    }
     if (!canDownload) {
       toast.error("Lien de telechargement invalide.")
       return
@@ -37,6 +43,15 @@ export function DownloadButton({
         toast.error(message)
       }
     })
+  }
+
+  if (!isSignedIn) {
+    return (
+      <Button size="lg" variant="outline" disabled className="flex-1 gap-2 sm:flex-none">
+        <DownloadCloud className="h-5 w-5" />
+        Se connecter pour telecharger
+      </Button>
+    )
   }
 
   return (

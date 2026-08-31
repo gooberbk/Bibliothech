@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 import { UTApi } from "uploadthing/server"
+import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
 import { downloadRateLimit } from "@/lib/rate-limit"
 import {
@@ -14,8 +15,22 @@ import {
 const utapi = new UTApi()
 
 const ensureAdmin = async () => {
-  // For now, skip admin check since auth is not implemented
-  return "admin"
+  const { userId } = await auth()
+  if (!userId) {
+    throw new Error("Connexion requise")
+  }
+  
+  // Find user by clerkId and check role
+  const user = await db.user.findUnique({
+    where: { clerkId: userId },
+    select: { id: true, role: true },
+  })
+  
+  if (!user || user.role !== "ADMIN") {
+    throw new Error("Accès refusé")
+  }
+  
+  return user.id
 }
 
 export const createResource = async (data: CreateResourceInput) => {
@@ -63,22 +78,72 @@ export const deleteResource = async (id: string) => {
 }
 
 export const toggleFavorite = async (resourceId: string) => {
-  throw new Error("Authentification non implémentée")
+  const { userId } = await auth()
+  if (!userId) {
+    throw new Error("Connexion requise")
+  }
+
+  const { resourceId: parsedResourceId } = ResourceIdSchema.parse({ resourceId })
+
+  // Find user by clerkId
+  const user = await db.user.findUnique({
+    where: { clerkId: userId },
+    select: { id: true },
+  })
+
+  if (!user) {
+    throw new Error("Utilisateur non trouvé")
+  }
+
+  const existing = await db.favorite.findUnique({
+    where: {
+      userId_resourceId: {
+        userId: user.id,
+        resourceId: parsedResourceId,
+      },
+    },
+    select: { id: true },
+  })
+
+  if (existing) {
+    await db.favorite.delete({ where: { id: existing.id } })
+    return { isFavorite: false }
+  }
+
+  await db.favorite.create({
+    data: {
+      userId: user.id,
+      resourceId: parsedResourceId,
+    },
+  })
+
+  return { isFavorite: true }
 }
 
 export const incrementDownload = async (resourceId: string) => {
+  const { userId } = await auth()
   const { resourceId: parsedResourceId } = ResourceIdSchema.parse({ resourceId })
 
-  const identifier = `guest:${parsedResourceId}`
+  const identifier = userId ?? `guest:${parsedResourceId}`
   const { success } = await downloadRateLimit.limit(identifier)
 
   if (!success) {
     throw new Error("Limite de téléchargements atteinte (5/minute)")
   }
 
+  let dbUserId: string | null = null
+  if (userId) {
+    const user = await db.user.findUnique({
+      where: { clerkId: userId },
+      select: { id: true },
+    })
+    dbUserId = user?.id ?? null
+  }
+
   await db.$transaction([
     db.download.create({
       data: {
+        userId: dbUserId,
         resourceId: parsedResourceId,
       },
     }),

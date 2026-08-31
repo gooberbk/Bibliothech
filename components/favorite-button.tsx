@@ -1,8 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { Heart } from "lucide-react"
+import { Heart, Loader2 } from "lucide-react"
+import { useAuth } from "@clerk/nextjs"
 import { toast } from "sonner"
+import { toggleFavorite } from "@/actions/resource-actions"
 import { Button } from "@/components/ui/button"
 
 type FavoriteButtonProps = {
@@ -14,8 +16,34 @@ export function FavoriteButton({
   resourceId,
   initialIsFavorite,
 }: FavoriteButtonProps) {
+  const { isSignedIn } = useAuth()
+  const [isFavorite, setIsFavorite] = React.useState(initialIsFavorite)
+  const [isPending, startTransition] = React.useTransition()
+
   const onToggle = () => {
-    toast.error("Authentification non implémentée")
+    if (!isSignedIn) {
+      toast.error("Connectez-vous pour ajouter aux favoris.")
+      return
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await toggleFavorite(resourceId)
+        setIsFavorite(result.isFavorite)
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Impossible de mettre a jour le favori."
+        toast.error(message)
+      }
+    })
+  }
+
+  if (!isSignedIn) {
+    return (
+      <Button size="lg" variant="outline" disabled>
+        <Heart className="h-5 w-5" />
+      </Button>
+    )
   }
 
   return (
@@ -23,9 +51,14 @@ export function FavoriteButton({
       size="lg"
       variant="outline"
       onClick={onToggle}
-      disabled
+      disabled={isPending}
+      className={isFavorite ? "text-red-500" : ""}
     >
-      <Heart className="h-5 w-5" />
+      {isPending ? (
+        <Loader2 className="h-5 w-5 animate-spin" />
+      ) : (
+        <Heart className={`h-5 w-5 ${isFavorite ? "fill-current" : ""}`} />
+      )}
     </Button>
   )
 }
