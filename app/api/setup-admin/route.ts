@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { hashAdminPassword } from '@/lib/admin-password'
 
+export const dynamic = 'force-dynamic'
+
 // ⚠️ SECURITY WARNING: This endpoint should be removed after initial setup
 // It allows admin account creation without authentication for initial setup
 export async function POST(request: Request) {

@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
 import { syncClerkUser } from "@/lib/clerk-sync"
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const { userId } = await auth()

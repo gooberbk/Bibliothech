@@ -3,6 +3,8 @@ import { WebhookEvent } from '@clerk/nextjs/server'
 import { Webhook } from 'svix'
 import { db } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
 
 export async function POST(req: Request) {
