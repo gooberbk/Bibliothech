@@ -11,12 +11,6 @@ import {
   TrendingUp,
   Zap,
   ArrowRight,
-  Download,
-  Heart,
-  RefreshCw,
-  TrendingUp,
-  Zap,
-  ArrowRight,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -50,76 +44,6 @@ type TopUser = {
   _count: {
     downloads: number
     favorites: number
-    activities: number
-  }
-}
-
-type QuickAction = {
-  title: string
-  description: string
-  href: string
-  icon: React.ElementType
-  badge?: string
-}
-
-const quickActions: QuickAction[] = [
-  {
-    title: "Ajouter une ressource",
-    description: "Importer un nouveau document",
-    href: "/admin/books/new",
-    icon: BookOpen,
-  },
-  {
-    title: "Créer une catégorie",
-    description: "Ajouter un nouveau module",
-    href: "/admin/categories/new",
-    icon: Folder,
-  },
-  {
-    title: "Gérer les utilisateurs",
-    description: "Administrer les membres",
-    href: "/admin/users",
-    icon: Users,
-  },
-  {
-    title: "Ajouter un admin",
-    description: "Créer un compte administrateur",
-    href: "/admin/admins",
-    icon: KeyRound,
-    badge: "Sécurité",
-  },
-]
-import { Badge } from "@/components/ui/badge"
-import { MonitoringDashboard } from "@/components/admin/monitoring-dashboard"
-import { ActivityChart } from "@/components/admin/activity-chart"
-import { getDashboardStats, getTopResources, getTopUsers } from "@/actions/analytics-actions"
-
-type DashboardStats = {
-  totalResources: number
-  totalUsers: number
-  totalAdmins: number
-  totalCategories: number
-  totalDownloads: number
-  totalFavorites: number
-}
-
-type TopResource = {
-  id: string
-  title: string
-  author: string
-  category: string
-  downloadCount: number
-  createdAt: Date
-}
-
-type TopUser = {
-  id: string
-  name: string | null
-  email: string | null
-  _count: {
-    downloads: number
-    favorites: number
-    activities: number
   }
 }
 
@@ -202,51 +126,6 @@ export default async function AdminOverviewPage() {
         </Button>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <Card className="border-destructive/50 bg-destructive/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">{error}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Actions rapides
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {quickActions.map((action) => (
-              <Link key={action.href} href={action.href}>
-                <div className="group flex flex-col gap-2 rounded-lg border p-4 transition-all hover:border-primary hover:bg-primary/5">
-                  <div className="flex items-start justify-between">
-                    <action.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                    {action.badge && (
-                      <Badge variant="secondary" className="text-xs">
-                        {action.badge}
-                      </Badge>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{action.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {action.description}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* KPI Cards */}
       {/* Error State */}
       {error && (
         <Card className="border-destructive/50 bg-destructive/5">
@@ -437,63 +316,6 @@ export default async function AdminOverviewPage() {
 
       {/* Top Resources & Users */}
       <div className="grid gap-6 md:grid-cols-2">
-      {/* Engagement Stats */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="group hover:border-primary/50 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Téléchargements
-            </CardTitle>
-            <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalDownloads}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.totalDownloads === 0 ? "Aucun téléchargement" : "Total téléchargements"}
-            </p>
-            {stats.totalResources > 0 && stats.totalDownloads > 0 && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                <span className="font-medium">
-                  {(stats.totalDownloads / stats.totalResources).toFixed(1)}
-                </span>{" "}
-                dl/ressource en moyenne
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="group hover:border-primary/50 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Favoris
-            </CardTitle>
-            <Heart className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalFavorites}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.totalFavorites === 0 ? "Aucun favori" : "Total favoris"}
-            </p>
-            {stats.totalUsers > 0 && stats.totalFavorites > 0 && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                <span className="font-medium">
-                  {(stats.totalFavorites / stats.totalUsers).toFixed(1)}
-                </span>{" "}
-                fav/utilisateur en moyenne
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <MonitoringDashboard />
-        </Card>
-      </div>
-
-      <ActivityChart />
-
-      {/* Top Resources & Users */}
-      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -602,7 +424,6 @@ export default async function AdminOverviewPage() {
             )}
           </CardContent>
         </Card>
-      </div>
       </div>
     </div>
   )

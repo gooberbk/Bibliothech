@@ -11,7 +11,7 @@ datasource db {
 
 model User {
   id              String     @id @default(cuid())
-  neonId          String?    @unique(map: "User_clerkId_key")
+  neonId          String?    @unique(map: "User_neonId_key")
   name            String?
   email           String?    @unique
   emailVerified   DateTime?
@@ -22,7 +22,7 @@ model User {
   academicInfo    String?
   activityVisible Boolean    @default(true)
   bio             String?
-  clerkId         String?
+  clerkId         String?    @unique(map: "User_clerkId_unique")
   lastSyncAt      DateTime?
   profileVisible  Boolean    @default(true)
   socialLinks     String?
@@ -171,11 +171,6 @@ model UserBadge {
   @@unique([userId, badgeId])
   @@index([userId])
   @@index([badgeId])
-}
-
-enum Role {
-  USER
-  ADMIN
 }
 
 enum Role {

@@ -1,32 +1,27 @@
-import { clerkMiddleware } from '@clerk/nextjs/server'
-import { adminMiddleware } from '@/lib/admin-middleware'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { adminMiddleware } from '@/lib/admin-middleware'
 
-export default clerkMiddleware()
+// Define which routes should be protected by Clerk
+const isPublicRoute = createRouteMatcher(['/admin-login(.*)', '/(.*)'])
+
+// Define which routes should be protected by admin middleware
+const isAdminRoute = (pathname: string) => pathname.startsWith('/admin') && pathname !== '/admin-login'
+
+export default clerkMiddleware((auth, request) => {
+  if (isAdminRoute(request.nextUrl.pathname)) {
+    return adminMiddleware(request)
+  }
+  
+  if (!isPublicRoute(request.nextUrl.pathname)) {
+    auth().protect()
+  }
+})
 
 export const config = {
   matcher: [
-    // Skip admin routes, Next.js internals, and static files.
-    '/((?!admin|admin-login|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Skip Next.js internals and static files
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes
     '/(api|trpc)(.*)',
   ],
-}
-
-// Apply admin middleware to admin routes
-export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin-login') {
-    return adminMiddleware(request)
-  }
-  
-  return clerkMiddleware()(request)
-}
-
-// Apply admin middleware to admin routes
-export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin-login') {
-    return adminMiddleware(request)
-  }
-  
-  return clerkMiddleware()(request)
 }

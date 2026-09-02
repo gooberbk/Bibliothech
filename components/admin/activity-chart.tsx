@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActivityChartData } from "@/actions/analytics-actions"
 
@@ -79,7 +79,7 @@ export function ActivityChart() {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={combinedData}>
+          <LineChart data={combinedData}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
               dataKey="date" 
@@ -99,17 +99,21 @@ export function ActivityChart() {
               itemStyle={{ color: "hsl(var(--foreground))" }}
             />
             <Legend />
-            <Bar 
+            <Line 
+              type="monotone"
               dataKey="Téléchargements" 
-              fill="hsl(var(--primary))" 
-              radius={[4, 4, 0, 0]}
+              stroke="hsl(var(--primary))" 
+              strokeWidth={2}
+              dot={{ fill: "hsl(var(--primary))" }}
             />
-            <Bar 
+            <Line 
+              type="monotone"
               dataKey="Favoris" 
-              fill="hsl(var(--secondary))" 
-              radius={[4, 4, 0, 0]}
+              stroke="hsl(var(--secondary))" 
+              strokeWidth={2}
+              dot={{ fill: "hsl(var(--secondary))" }}
             />
-          </BarChart>
+          </LineChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

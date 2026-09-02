@@ -18,9 +18,11 @@ interface ResourceFiltersProps {
   onSearchChange: (value: string) => void
   categoryFilter: string
   onCategoryChange: (value: string) => void
-  categories: string[]
-  selectedCount: number
+  typeFilter: string
+  onTypeChange: (value: string) => void
   onClearFilters: () => void
+  categories: string[]
+  types: string[]
 }
 
 export function ResourceFilters({
@@ -28,11 +30,13 @@ export function ResourceFilters({
   onSearchChange,
   categoryFilter,
   onCategoryChange,
-  categories,
-  selectedCount,
+  typeFilter,
+  onTypeChange,
   onClearFilters,
+  categories,
+  types,
 }: ResourceFiltersProps) {
-  const hasActiveFilters = searchQuery || categoryFilter
+  const hasActiveFilters = searchQuery || categoryFilter !== "all" || typeFilter !== "all"
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -60,27 +64,33 @@ export function ResourceFilters({
             ))}
           </SelectContent>
         </Select>
+
+        <Select value={typeFilter} onValueChange={onTypeChange}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Tous types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous types</SelectItem>
+            {types.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="flex items-center gap-3">
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearFilters}
-            className="text-muted-foreground"
-          >
-            <X className="mr-2 h-4 w-4" />
-            Effacer
-          </Button>
-        )}
-        
-        {selectedCount > 0 && (
-          <Badge variant="secondary" className="ml-auto">
-            {selectedCount} sélectionné(s)
-          </Badge>
-        )}
-      </div>
+      {hasActiveFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClearFilters}
+          className="text-muted-foreground"
+        >
+          <X className="mr-2 h-4 w-4" />
+          Effacer
+        </Button>
+      )}
     </div>
   )
 }
