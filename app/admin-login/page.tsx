@@ -1,9 +1,25 @@
-import { LockKeyhole } from "lucide-react"
+import { LockKeyhole, AlertCircle } from "lucide-react"
 import { loginAdmin } from "@/actions/admin-auth-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+
+const errorMessages: Record<string, { title: string; message: string }> = {
+  missing: {
+    title: "Champs manquants",
+    message: "Nom utilisateur et mot de passe requis.",
+  },
+  invalid: {
+    title: "Identifiants invalides",
+    message: "Nom utilisateur ou mot de passe incorrect.",
+  },
+  ratelimit: {
+    title: "Trop de tentatives",
+    message: "Trop de tentatives de connexion. Veuillez réessayer dans 15 minutes.",
+  },
+}
 
 export default async function AdminLoginPage({
   searchParams,
@@ -25,7 +41,13 @@ export default async function AdminLoginPage({
           <form action={loginAdmin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Nom utilisateur</Label>
-              <Input id="username" name="username" autoComplete="username" required />
+              <Input 
+                id="username" 
+                name="username" 
+                autoComplete="username" 
+                required 
+                placeholder="admin"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Mot de passe</Label>
@@ -35,14 +57,16 @@ export default async function AdminLoginPage({
                 type="password"
                 autoComplete="current-password"
                 required
+                placeholder="••••••••"
               />
             </div>
-            {error && (
-              <p className="text-sm text-destructive">
-                {error === "missing"
-                  ? "Nom utilisateur et mot de passe requis."
-                  : "Identifiants admin invalides."}
-              </p>
+            {error && errorMessages[error] && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>{errorMessages[error].title}:</strong> {errorMessages[error].message}
+                </AlertDescription>
+              </Alert>
             )}
             <Button type="submit" className="w-full">
               Entrer

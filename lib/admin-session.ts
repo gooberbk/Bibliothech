@@ -1,15 +1,19 @@
-import { createHmac, timingSafeEqual } from "crypto"
+import { createHmac, timingSafeEqual, randomBytes } from "crypto"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 
 const cookieName = "bibliothech_admin_session"
-const maxAgeSeconds = 60 * 60 * 8
+const maxAgeSeconds = 60 * 60 * 8 // 8 hours
+const sessionVersion = "v1" // For future session migration
 
 type AdminSessionPayload = {
   sub: string
   username: string
   exp: number
+  iat: number
+  version: string
+  jti: string // JWT ID for session tracking
 }
 
 function getSessionSecret() {
@@ -43,11 +47,19 @@ function verifySignature(value: string, signature: string) {
   )
 }
 
+function generateSessionId(): string {
+  return randomBytes(16).toString("hex")
+}
+
 export async function createAdminSession(admin: { id: string; username: string }) {
+  const now = Math.floor(Date.now() / 1000)
   const payload: AdminSessionPayload = {
     sub: admin.id,
     username: admin.username,
-    exp: Math.floor(Date.now() / 1000) + maxAgeSeconds,
+    exp: now + maxAgeSeconds,
+    iat: now,
+    version: sessionVersion,
+    jti: generateSessionId(),
   }
   const encodedPayload = encodeBase64Url(JSON.stringify(payload))
   const session = `${encodedPayload}.${sign(encodedPayload)}`
@@ -59,6 +71,10 @@ export async function createAdminSession(admin: { id: string; username: string }
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: maxAgeSeconds,
+    // Additional security attributes
+    ...(process.env.NODE_ENV === "production" && {
+      domain: process.env.ADMIN_COOKIE_DOMAIN,
+    }),
   })
 }
 
@@ -76,26 +92,55 @@ export async function getAdminSession() {
 
   const [encodedPayload, signature] = rawSession.split(".")
   if (!encodedPayload || !signature || !verifySignature(encodedPayload, signature)) {
+    // Invalid signature - clear the cookie
+    await clearAdminSession()
     return null
   }
 
   try {
     const payload = JSON.parse(decodeBase64Url(encodedPayload)) as AdminSessionPayload
-    if (!payload.sub || payload.exp < Math.floor(Date.now() / 1000)) {
+    
+    // Validate required fields
+    if (!payload.sub || !payload.username || !payload.exp || !payload.iat) {
+      await clearAdminSession()
       return null
     }
 
+    // Check expiration
+    if (payload.exp < Math.floor(Date.now() / 1000)) {
+      await clearAdminSession()
+      return null
+    }
+
+    // Check session version for future migrations
+    if (payload.version !== sessionVersion) {
+      await clearAdminSession()
+      return null
+    }
+
+    // Verify admin still exists and is active
     const admin = await db.adminAccount.findUnique({
       where: { id: payload.sub },
-      select: { id: true, username: true, name: true, active: true },
+      select: { id: true, username: true, name: true, active: true, updatedAt: true },
     })
 
     if (!admin?.active) {
+      await clearAdminSession()
+      return null
+    }
+
+    // Additional security: check if admin was updated after session creation
+    // This allows for immediate session invalidation on password changes
+    const sessionCreationTime = new Date(payload.iat * 1000)
+    if (admin.updatedAt > sessionCreationTime) {
+      await clearAdminSession()
       return null
     }
 
     return admin
-  } catch {
+  } catch (error) {
+    // Invalid payload format - clear the cookie
+    await clearAdminSession()
     return null
   }
 }
@@ -114,4 +159,12 @@ export async function ensureAdminSession() {
     throw new Error("Connexion admin requise")
   }
   return admin
+}
+
+// New function to invalidate all sessions for an admin
+export async function invalidateAdminSessions(adminId: string) {
+  await db.adminAccount.update({
+    where: { id: adminId },
+    data: { updatedAt: new Date() },
+  })
 }

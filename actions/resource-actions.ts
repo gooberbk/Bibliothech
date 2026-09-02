@@ -5,10 +5,11 @@ import { UTApi } from "uploadthing/server"
 import { auth } from "@clerk/nextjs/server"
 import { db } from "@/lib/db"
 import { ensureAdminSession } from "@/lib/admin-session"
-import { downloadRateLimit } from "@/lib/rate-limit"
+import { downloadRateLimit, adminActionRateLimit } from "@/lib/rate-limit"
 import { syncClerkUser } from "@/lib/clerk-sync"
 import { trackUserActivity } from "@/lib/activity/tracker"
 import { checkAndAwardBadges } from "@/lib/badges/awarding"
+import { logResourceAction } from "@/lib/admin-audit"
 import {
   DeleteResourceSchema,
   ResourceIdSchema,
@@ -19,11 +20,18 @@ import {
 const utapi = new UTApi()
 
 const ensureAdmin = async () => {
-  return ensureAdminSession()
+  const admin = await ensureAdminSession()
+  
+  const { success } = await adminActionRateLimit.limit(admin.id)
+  if (!success) {
+    throw new Error("Trop de requêtes. Veuillez réessayer plus tard.")
+  }
+  
+  return admin
 }
 
 export const createResource = async (data: CreateResourceInput) => {
-  await ensureAdmin()
+  const admin = await ensureAdmin()
   const payload = ResourceSchema.parse(data)
 
   // Find category by name to get categoryId
@@ -42,25 +50,80 @@ export const createResource = async (data: CreateResourceInput) => {
     },
   })
 
+  await logResourceAction(
+    admin.id,
+    admin.username,
+    "CREATE_RESOURCE",
+    resource.id,
+    resource.title
+  )
+
   revalidatePath("/", "page")
   revalidateTag("resources-list", "max")
   return resource
 }
 
-export const getAdminResources = async () => {
-  await ensureAdmin()
-  return db.resource.findMany({
-    orderBy: { createdAt: "desc" },
-  })
+export const getAdminResources = async (options?: {
+  page?: number
+  limit?: number
+  search?: string
+  category?: string
+}) => {
+  const admin = await ensureAdmin()
+  
+  const page = options?.page || 1
+  const limit = options?.limit || 10
+  const search = options?.search
+  const category = options?.category
+
+  const where = {
+    ...(search && {
+      OR: [
+        { title: { contains: search, mode: "insensitive" } },
+        { author: { contains: search, mode: "insensitive" } },
+      ],
+    }),
+    ...(category && category !== "all" && { category }),
+  }
+
+  const [resources, total] = await Promise.all([
+    db.resource.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        category: true,
+        type: true,
+        pageCount: true,
+        fileSizeMb: true,
+        coverUrl: true,
+        createdAt: true,
+        downloadCount: true,
+      },
+    }),
+    db.resource.count({ where }),
+  ])
+
+  return {
+    resources,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  }
 }
 
 export const deleteResource = async (id: string) => {
-  await ensureAdmin()
+  const admin = await ensureAdmin()
   const { id: resourceId } = DeleteResourceSchema.parse({ id })
 
   const resource = await db.resource.findUnique({
     where: { id: resourceId },
-    select: { id: true, fileKey: true, coverKey: true },
+    select: { id: true, fileKey: true, coverKey: true, title: true },
   })
 
   if (!resource) {
@@ -68,14 +131,127 @@ export const deleteResource = async (id: string) => {
   }
 
   await db.resource.delete({ where: { id: resource.id } })
+  
   try {
     await utapi.deleteFiles([resource.fileKey, resource.coverKey])
   } catch {
     // Keeps DB deletion successful even if storage cleanup fails for legacy/temp keys.
   }
 
+  await logResourceAction(
+    admin.id,
+    admin.username,
+    "DELETE_RESOURCE",
+    resource.id,
+    resource.title
+  )
+
   revalidatePath("/", "page")
   revalidateTag("resources-list", "max")
+}
+
+export const updateResource = async (id: string, data: Partial<CreateResourceInput>) => {
+  const admin = await ensureAdmin()
+  const { id: resourceId } = ResourceIdSchema.parse({ id })
+  
+  const payload = ResourceSchema.partial().parse(data)
+
+  // If category is being updated, find the category ID
+  let categoryId = undefined
+  if (payload.category) {
+    const category = await db.category.findUnique({
+      where: { name: payload.category },
+    })
+    if (!category) {
+      throw new Error("Catégorie introuvable")
+    }
+    categoryId = category.id
+  }
+
+  const resource = await db.resource.update({
+    where: { id: resourceId },
+    data: {
+      ...payload,
+      ...(categoryId && { categoryId }),
+    },
+  })
+
+  await logResourceAction(
+    admin.id,
+    admin.username,
+    "UPDATE_RESOURCE",
+    resource.id,
+    resource.title
+  )
+
+  revalidatePath("/", "page")
+  revalidateTag("resources-list", "max")
+  return resource
+}
+
+export const getResourceById = async (id: string) => {
+  const admin = await ensureAdmin()
+  const { id: resourceId } = ResourceIdSchema.parse({ id })
+
+  return db.resource.findUnique({
+    where: { id: resourceId },
+    select: {
+      id: true,
+      title: true,
+      author: true,
+      description: true,
+      category: true,
+      type: true,
+      pageCount: true,
+      fileSizeMb: true,
+      fileUrl: true,
+      fileKey: true,
+      coverUrl: true,
+      coverKey: true,
+      downloadCount: true,
+      createdAt: true,
+    },
+  })
+}
+
+export const deleteMultipleResources = async (ids: string[]) => {
+  const admin = await ensureAdmin()
+  
+  if (!ids || ids.length === 0) {
+    throw new Error("Aucune ressource sélectionnée")
+  }
+
+  const resources = await db.resource.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, fileKey: true, coverKey: true, title: true },
+  })
+
+  await db.resource.deleteMany({
+    where: { id: { in: ids } },
+  })
+
+  // Delete files from storage
+  const fileKeys = resources.flatMap(r => [r.fileKey, r.coverKey])
+  try {
+    await utapi.deleteFiles(fileKeys)
+  } catch {
+    // Continue even if storage cleanup fails
+  }
+
+  // Log each deletion
+  for (const resource of resources) {
+    await logResourceAction(
+      admin.id,
+      admin.username,
+      "DELETE_RESOURCE",
+      resource.id,
+      resource.title
+    )
+  }
+
+  revalidatePath("/", "page")
+  revalidateTag("resources-list", "max")
+  return { deletedCount: resources.length }
 }
 
 export const toggleFavorite = async (resourceId: string) => {

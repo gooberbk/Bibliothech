@@ -4,24 +4,15 @@ import * as React from "react"
 import Link from "next/link"
 import {
   Plus,
-  Pencil,
-  Trash2,
   Folder,
   ArrowLeft,
+  RefreshCw,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
+import { CategoryCard } from "@/components/admin/category-card"
 import { getCategories, deleteCategory } from "@/actions/category-actions"
 import { toast } from "sonner"
 
@@ -36,18 +27,21 @@ type Category = {
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = React.useState<Category[]>([])
+  const [filteredCategories, setFilteredCategories] = React.useState<Category[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
-  const [categoryToDelete, setCategoryToDelete] = React.useState<Category | null>(null)
-  const [isDeleting, setIsDeleting] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
 
   const loadCategories = React.useCallback(async () => {
     setIsLoading(true)
+    setError(null)
     try {
       const data = await getCategories()
       setCategories(data)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Impossible de charger les catégories."
+      setFilteredCategories(data)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Impossible de charger les catégories."
+      setError(message)
       toast.error(message)
     } finally {
       setIsLoading(false)
@@ -55,143 +49,166 @@ export default function AdminCategoriesPage() {
   }, [])
 
   React.useEffect(() => {
-    void loadCategories()
+    loadCategories()
   }, [loadCategories])
 
-  const handleDelete = (category: Category) => {
-    setCategoryToDelete(category)
-    setDeleteDialogOpen(true)
+  React.useEffect(() => {
+    if (!searchQuery) {
+      setFilteredCategories(categories)
+      return
+    }
+
+    const query = searchQuery.toLowerCase()
+    const filtered = categories.filter(
+      (category) =>
+        category.name.toLowerCase().includes(query) ||
+        category.slug.toLowerCase().includes(query)
+    )
+    setFilteredCategories(filtered)
+  }, [searchQuery, categories])
+
+  const handleEdit = (category: Category) => {
+    // Navigate to edit page - will be handled by the CategoryCard
+    window.location.href = `/admin/categories/${category.id}/edit`
   }
 
-  const confirmDelete = async () => {
-    if (!categoryToDelete) return
-
-    setIsDeleting(true)
-    const loadingToastId = toast.loading("Suppression en cours...")
+  const handleDelete = async (category: Category) => {
     try {
-      await deleteCategory(categoryToDelete.id)
-      setCategories((prev) => prev.filter((cat) => cat.id !== categoryToDelete.id))
-      setDeleteDialogOpen(false)
-      setCategoryToDelete(null)
-      toast.dismiss(loadingToastId)
-      toast.success("Catégorie supprimée avec succès.")
-    } catch (error) {
-      toast.dismiss(loadingToastId)
-      const message = error instanceof Error ? error.message : "Échec de suppression."
+      await deleteCategory(category.id)
+      toast.success("Catégorie supprimée avec succès")
+      await loadCategories()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Échec de suppression"
       toast.error(message)
-    } finally {
-      setIsDeleting(false)
     }
+  }
+
+  const handleClearSearch = () => {
+    setSearchQuery("")
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/admin">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">Gestion des Catégories</h1>
-          <p className="mt-1 text-muted-foreground">
-            Gérez les catégories de ressources de la bibliothèque.
-          </p>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/admin">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Gestion des Catégories</h1>
+            <p className="mt-1 text-muted-foreground">
+              {categories.length > 0 
+                ? `${categories.length} catégorie(s)` 
+                : "Gérez les catégories de ressources de la bibliothèque"}
+            </p>
+          </div>
         </div>
-        <Button asChild>
-          <Link href="/admin/categories/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvelle Catégorie
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={loadCategories} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
+          <Button asChild>
+            <Link href="/admin/categories/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvelle Catégorie
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Folder className="h-5 w-5" />
-            Liste des catégories ({categories.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="text-center text-muted-foreground py-8">
-              Chargement des catégories...
-            </p>
-          ) : categories.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              Aucune catégorie pour le moment.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {categories.map((category) => (
-                <div
-                  key={category.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                      <Folder className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{category.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Slug: {category.slug}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary">
-                      {category._count.resources} ressource(s)
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                    >
-                      <Link href={`/admin/categories/${category.id}/edit`}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Modifier
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(category)}
-                      disabled={category._count.resources > 0}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Supprimer
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher par nom ou slug..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+            onClick={handleClearSearch}
+          >
+            ×
+          </Button>
+        )}
+      </div>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette catégorie ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer &ldquo;{categoryToDelete?.name}
-              &rdquo; ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Suppression..." : "Supprimer"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Error State */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading State */}
+      {isLoading && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+              <p className="text-sm text-muted-foreground">Chargement des catégories...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && categories.length === 0 && (
+        <Card>
+          <CardContent className="pt-12">
+            <div className="flex flex-col items-center justify-center text-center">
+              <Folder className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-sm text-muted-foreground mb-4">
+                Aucune catégorie pour le moment
+              </p>
+              <Button asChild variant="outline">
+                <Link href="/admin/categories/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Créer la première catégorie
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No Results State */}
+      {!isLoading && categories.length > 0 && filteredCategories.length === 0 && (
+        <Card>
+          <CardContent className="pt-12">
+            <div className="flex flex-col items-center justify-center text-center">
+              <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-sm text-muted-foreground">
+                Aucune catégorie ne correspond à votre recherche
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Categories Grid */}
+      {!isLoading && filteredCategories.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredCategories.map((category) => (
+            <CategoryCard
+              key={category.id}
+              category={category}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

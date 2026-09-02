@@ -3,11 +3,12 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createCategory } from "@/actions/category-actions"
 import { toast } from "sonner"
 
@@ -18,12 +19,28 @@ export default function NewCategoryPage() {
     name: "",
   })
   const [errors, setErrors] = React.useState<Record<string, string>>({})
+  const [previewSlug, setPreviewSlug] = React.useState("")
+
+  // Generate slug preview as user types
+  React.useEffect(() => {
+    const slug = formData.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    setPreviewSlug(slug)
+  }, [formData.name])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
       newErrors.name = "Le nom est requis"
+    } else if (formData.name.length > 100) {
+      newErrors.name = "Le nom ne peut pas dépasser 100 caractères"
+    } else if (!/^[a-zA-Z0-9\sÀ-ÿ-]+$/.test(formData.name)) {
+      newErrors.name = "Caractères invalides (lettres, chiffres, espaces et tirets uniquement)"
     }
 
     setErrors(newErrors)
@@ -46,11 +63,15 @@ export default function NewCategoryPage() {
       toast.dismiss(loadingToastId)
       toast.success("Catégorie créée avec succès !")
       router.push("/admin/categories")
-      router.refresh()
     } catch (error) {
       toast.dismiss(loadingToastId)
       const message = error instanceof Error ? error.message : "Une erreur est survenue."
       toast.error(message)
+      
+      // Set error from server response
+      if (error instanceof Error && error.message.includes("existe déjà")) {
+        setErrors({ name: error.message })
+      }
     } finally {
       setIsLoading(false)
     }
@@ -88,14 +109,24 @@ export default function NewCategoryPage() {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 className={errors.name ? "border-destructive" : ""}
+                maxLength={100}
               />
               {errors.name && (
                 <p className="text-xs text-destructive">{errors.name}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Le slug sera généré automatiquement à partir du nom.
+                Lettres, chiffres, espaces et tirets uniquement. Max 100 caractères.
               </p>
             </div>
+
+            {previewSlug && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Slug généré: <code className="bg-muted px-1.5 py-0.5 rounded">{previewSlug}</code>
+                </AlertDescription>
+              </Alert>
+            )}
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" disabled={isLoading}>

@@ -1,37 +1,20 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
-  Search,
   Plus,
-  MoreHorizontal,
-  Pencil,
-  Link2,
+  BookOpen,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
+  ArrowLeft,
+  RefreshCw,
 } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Card, CardContent } from "@/components/ui/card"
+import { ResourceTable } from "@/components/admin/resource-table"
+import { ResourceFilters } from "@/components/admin/resource-filters"
+import { Pagination } from "@/components/admin/pagination"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,13 +25,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { deleteResource, getAdminResources } from "@/actions/resource-actions"
+import { getAdminResources, deleteResource, deleteMultipleResources } from "@/actions/resource-actions"
 import { getCategories } from "@/actions/category-actions"
-import { categoryStyles } from "@/lib/data"
-import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
-type AdminBook = {
+type Resource = {
   id: string
   title: string
   author: string
@@ -58,338 +39,301 @@ type AdminBook = {
   size: string
   coverUrl: string
   createdAt: string
+  downloadCount?: number
 }
 
-const getCategoryStyle = (category: string): string => {
-  return categoryStyles[category as keyof typeof categoryStyles] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400 border-gray-200"
+type PaginatedResourcesResponse = {
+  resources: Resource[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
 }
 
 export default function AdminBooksPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [books, setBooks] = React.useState<AdminBook[]>([])
-  const [isFetching, setIsFetching] = React.useState(true)
-  const [fetchError, setFetchError] = React.useState<string | null>(null)
+  const [categoryFilter, setCategoryFilter] = React.useState("all")
+  const [categories, setCategories] = React.useState<string[]>([])
+  const [resourcesData, setResourcesData] = React.useState<PaginatedResourcesResponse | null>(null)
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [isDeleting, setIsDeleting] = React.useState(false)
-  const [selectedBooks, setSelectedBooks] = React.useState<string[]>([])
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
-  const [bookToDelete, setBookToDelete] = React.useState<AdminBook | null>(null)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = React.useState(false)
   const [currentPage, setCurrentPage] = React.useState(1)
   const itemsPerPage = 10
 
-  const loadResources = React.useCallback(async () => {
-    setIsFetching(true)
-    setFetchError(null)
+  // Load categories
+  const loadCategories = React.useCallback(async () => {
     try {
-      const rows = await getAdminResources()
-      const mapped: AdminBook[] = rows.map((resource) => ({
+      const data = await getCategories()
+      setCategories(data.map(c => c.name))
+    } catch (err) {
+      console.error("Failed to load categories:", err)
+    }
+  }, [])
+
+  // Load resources with filters and pagination
+  const loadResources = React.useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await getAdminResources({
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery || undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+      })
+      
+      const mappedResources = data.resources.map((resource) => ({
         id: resource.id,
         title: resource.title,
         author: resource.author,
         category: resource.category,
-        format: "PDF",
+        format: resource.type,
         pages: resource.pageCount,
         size: `${resource.fileSizeMb.toFixed(1)} Mo`,
         coverUrl: resource.coverUrl,
         createdAt: resource.createdAt.toISOString(),
+        downloadCount: resource.downloadCount,
       }))
-      setBooks(mapped)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Impossible de charger les ressources."
-      setFetchError(message)
+
+      setResourcesData({
+        ...data,
+        resources: mappedResources,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Impossible de charger les ressources."
+      setError(message)
       toast.error(message)
     } finally {
-      setIsFetching(false)
+      setIsLoading(false)
     }
-  }, [])
+  }, [currentPage, itemsPerPage, searchQuery, categoryFilter])
+
+  // Initial load
+  React.useEffect(() => {
+    loadCategories()
+  }, [loadCategories])
 
   React.useEffect(() => {
-    void loadResources()
+    loadResources()
   }, [loadResources])
 
+  // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, categoryFilter])
 
-  const filteredBooks = React.useMemo(() => {
-    if (!searchQuery) return books
-    const query = searchQuery.toLowerCase()
-    return books.filter(
-      (book) =>
-        book.title.toLowerCase().includes(query) ||
-        book.author.toLowerCase().includes(query)
-    )
-  }, [books, searchQuery])
-
-  const totalPages = Math.ceil(filteredBooks.length / itemsPerPage)
-  const paginatedBooks = filteredBooks.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
+  // Clear selection when resources change
   React.useEffect(() => {
-    if (totalPages > 0 && currentPage > totalPages) {
-      setCurrentPage(totalPages)
-    }
-  }, [currentPage, totalPages])
+    setSelectedIds([])
+  }, [resourcesData])
 
-  const toggleSelectAll = () => {
-    if (selectedBooks.length === paginatedBooks.length) {
-      setSelectedBooks([])
-    } else {
-      setSelectedBooks(paginatedBooks.map((book) => book.id))
+  const handleCopyLink = (resource: Resource) => {
+    const url = `${window.location.origin}/book/${resource.id}`
+    navigator.clipboard.writeText(url)
+    toast.success("Lien copié dans le presse-papier")
+  }
+
+  const handleEdit = (resource: Resource) => {
+    router.push(`/admin/books/${resource.id}/edit`)
+  }
+
+  const handleDelete = async (resource: Resource) => {
+    try {
+      await deleteResource(resource.id)
+      toast.success("Ressource supprimée avec succès")
+      await loadResources()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Échec de suppression"
+      toast.error(message)
     }
   }
 
-  const toggleSelect = (id: string) => {
-    if (selectedBooks.includes(id)) {
-      setSelectedBooks(selectedBooks.filter((bookId) => bookId !== id))
-    } else {
-      setSelectedBooks([...selectedBooks, id])
-    }
-  }
-
-  const handleDelete = (book: AdminBook) => {
-    setBookToDelete(book)
-    setDeleteDialogOpen(true)
-  }
-
-  const confirmDelete = async () => {
-    if (!bookToDelete) return
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
 
     setIsDeleting(true)
     const loadingToastId = toast.loading("Suppression en cours...")
+
     try {
-      await deleteResource(bookToDelete.id)
-      setBooks((prev) => prev.filter((book) => book.id !== bookToDelete.id))
-      setSelectedBooks((prev) => prev.filter((id) => id !== bookToDelete.id))
-      setDeleteDialogOpen(false)
-      setBookToDelete(null)
+      await deleteMultipleResources(selectedIds)
+      setSelectedIds([])
+      setBulkDeleteDialogOpen(false)
       toast.dismiss(loadingToastId)
-      toast.success("Ressource supprimée avec succès.")
-    } catch (error) {
+      toast.success(`${selectedIds.length} ressource(s) supprimée(s) avec succès`)
+      await loadResources()
+    } catch (err) {
       toast.dismiss(loadingToastId)
-      const message = error instanceof Error ? error.message : "Échec de suppression."
+      const message = err instanceof Error ? err.message : "Échec de suppression"
       toast.error(message)
     } finally {
       setIsDeleting(false)
     }
   }
 
-  const copyLink = async (book: AdminBook) => {
-    const url = `${window.location.origin}/book/${book.id}`
-    await navigator.clipboard.writeText(url)
-    toast.success("Lien copié.")
+  const handleClearFilters = () => {
+    setSearchQuery("")
+    setCategoryFilter("all")
+  }
+
+  const isAllSelected = resourcesData && selectedIds.length === resourcesData.resources.length
+  const isSomeSelected = selectedIds.length > 0 && !isAllSelected
+
+  if (isLoading && !resourcesData) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/admin">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Gestion des Livres</h1>
+            <p className="mt-1 text-muted-foreground">Chargement...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Gestion des Livres
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Gérez les ressources de la bibliothèque.
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/admin/books/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Ajouter une ressource
-          </Link>
-        </Button>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Filtrer par titre..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        {selectedBooks.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            {selectedBooks.length} élément(s) sélectionné(s)
-          </p>
-        )}
-      </div>
-
-      {fetchError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {fetchError}
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="rounded-lg border border-border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={
-                    paginatedBooks.length > 0 &&
-                    selectedBooks.length === paginatedBooks.length
-                  }
-                  onCheckedChange={toggleSelectAll}
-                  aria-label="Tout sélectionner"
-                />
-              </TableHead>
-              <TableHead>Titre</TableHead>
-              <TableHead>Catégorie</TableHead>
-              <TableHead>Format</TableHead>
-              <TableHead>Pages / Poids</TableHead>
-              <TableHead>Date d&apos;ajout</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isFetching ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  Chargement des ressources...
-                </TableCell>
-              </TableRow>
-            ) : paginatedBooks.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  Aucune ressource trouvée.
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedBooks.map((book) => (
-                <TableRow key={book.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedBooks.includes(book.id)}
-                    onCheckedChange={() => toggleSelect(book.id)}
-                    aria-label={`Sélectionner ${book.title}`}
-                  />
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-12 w-9 overflow-hidden rounded bg-muted">
-                      <Image
-                        src={book.coverUrl}
-                        alt={book.title}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div>
-                      <p className="font-medium">{book.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {book.author}
-                      </p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "text-xs",
-                      getCategoryStyle(book.category)
-                    )}
-                  >
-                    {book.category}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm">{book.format}</span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm">
-                    {book.pages} pages / {book.size}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(book.createdAt).toLocaleDateString("fr-FR")}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/books/${book.id}/edit`}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Éditer
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => copyLink(book)}>
-                        <Link2 className="mr-2 h-4 w-4" />
-                        Copier le lien
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(book)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-
-        {/* Pagination */}
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Page {totalPages === 0 ? 0 : currentPage} sur {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Précédent
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages || 1, p + 1))}
-              disabled={totalPages === 0 || currentPage === totalPages}
-            >
-              Suivant
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/admin">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Gestion des Livres</h1>
+            <p className="mt-1 text-muted-foreground">
+              {resourcesData ? `${resourcesData.total} ressource(s)` : "Gérez les ressources de la bibliothèque"}
+            </p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={loadResources} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
+          <Button asChild>
+            <Link href="/admin/books/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Ajouter une ressource
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* Error State */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filters */}
+      <ResourceFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        categoryFilter={categoryFilter}
+        onCategoryChange={setCategoryFilter}
+        categories={categories}
+        selectedCount={selectedIds.length}
+        onClearFilters={handleClearFilters}
+      />
+
+      {/* Bulk Actions */}
+      {selectedIds.length > 0 && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <span className="font-medium">{selectedIds.length} ressource(s) sélectionnée(s)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedIds([])}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Supprimer
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Resource Table */}
+      {resourcesData && (
+        <>
+          <ResourceTable
+            resources={resourcesData.resources}
+            selectedIds={selectedIds}
+            onSelectAll={(checked) => {
+              if (checked) {
+                setSelectedIds(resourcesData.resources.map(r => r.id))
+              } else {
+                setSelectedIds([])
+              }
+            }}
+            onSelect={(id) => {
+              setSelectedIds(prev =>
+                prev.includes(id)
+                  ? prev.filter(i => i !== id)
+                  : [...prev, id]
+              )
+            }}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onCopyLink={handleCopyLink}
+            isAllSelected={isAllSelected}
+            isSomeSelected={isSomeSelected}
+          />
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={resourcesData.page}
+            totalPages={resourcesData.totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={resourcesData.total}
+            itemsPerPage={resourcesData.limit}
+          />
+        </>
+      )}
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette ressource ?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer {selectedIds.length} ressource(s) ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer &ldquo;{bookToDelete?.title}
-              &rdquo; ? Cette action est irréversible.
+              Êtes-vous sûr de vouloir supprimer {selectedIds.length} ressource(s) ? 
+              Cette action est irréversible et supprimera également les fichiers du stockage.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={handleBulkDelete}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

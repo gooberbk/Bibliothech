@@ -1,52 +1,83 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["schemaEngineDriverAdapters"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-enum Role {
-  USER
-  ADMIN
-}
-
 model User {
-  id            String    @id @default(cuid())
-  clerkId       String?   @unique
-  neonId        String?   @unique
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  role          Role      @default(USER)
-  bio           String?   @db.Text
-  socialLinks   String?   @db.Text // JSON string for social links
-  academicInfo  String?   @db.Text // JSON string for academic info
-  profileVisible Boolean  @default(true)
-  activityVisible Boolean @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastSyncAt    DateTime?
-
-  favorites  Favorite[]
-  downloads  Download[]
-  activities UserActivity[]
-  badges     UserBadge[]
+  id              String     @id @default(cuid())
+  neonId          String?    @unique(map: "User_clerkId_key")
+  name            String?
+  email           String?    @unique
+  emailVerified   DateTime?
+  image           String?
+  role            Role       @default(USER)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  academicInfo    String?
+  activityVisible Boolean    @default(true)
+  bio             String?
+  clerkId         String?
+  lastSyncAt      DateTime?
+  profileVisible  Boolean    @default(true)
+  socialLinks     String?
+  downloads       Download[]
+  favorites       Favorite[]
 }
 
 model AdminAccount {
-  id           String    @id @default(cuid())
-  username     String    @unique
-  passwordHash String
+  id           String              @id @default(cuid())
   name         String?
-  active       Boolean   @default(true)
+  active       Boolean             @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  passwordHash String
+  username     String              @unique
+  auditLogs    AdminAuditLog[]
+  loginHistory AdminLoginHistory[]
+}
+
+model AdminAuditLog {
+  id             String   @id @default(cuid())
+  adminId        String
+  adminUsername  String
+  action         String
+  entityType     String?
+  entityId       String?
+  metadata       String?
+  ipAddress      String
+  userAgent      String
+  createdAt      DateTime @default(now())
+
+  admin          AdminAccount @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+model AdminLoginHistory {
+  id           String      @id @default(cuid())
+  adminId      String
+  adminUsername String
+  ipAddress    String
+  userAgent    String
+  success      Boolean
+  failureReason String?
+  createdAt    DateTime    @default(now())
+
+  admin        AdminAccount @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([createdAt])
+  @@index([success])
 }
 
 model Category {
@@ -55,32 +86,27 @@ model Category {
   slug      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  resources Resource[]
 }
 
 model Resource {
-  id          String   @id @default(cuid())
-  title       String
-  author      String
-  description String?  @db.Text
-  category    String
-  categoryId  String?
-  type        String
-  pageCount   Int
-  fileSizeMb  Float
-  fileUrl     String
-  fileKey     String
-  coverUrl    String
-  coverKey    String
-
-  downloadCount Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  favoritedBy  Favorite[]
-  downloadedBy Download[]
-  categoryRelation Category? @relation(fields: [categoryId], references: [id])
+  id            String     @id @default(cuid())
+  title         String
+  author        String
+  description   String?
+  category      String
+  type          String
+  pageCount     Int
+  fileSizeMb    Float
+  fileUrl       String
+  fileKey       String
+  coverUrl      String
+  coverKey      String
+  downloadCount Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  categoryId    String?
+  downloadedBy  Download[]
+  favoritedBy   Favorite[]
 
   @@index([category])
   @@index([type])
@@ -92,9 +118,8 @@ model Favorite {
   userId     String
   resourceId String
   createdAt  DateTime @default(now())
-
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, resourceId])
   @@index([userId])
@@ -105,25 +130,22 @@ model Download {
   userId     String?
   resourceId String
   createdAt  DateTime @default(now())
-
-  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id])
 
   @@index([resourceId])
 }
 
 model UserActivity {
-  id          String   @id @default(cuid())
-  userId      String
-  action      String   // "download", "favorite", "profile_view", "login", etc.
-  entityId    String?  // Optional ID of related entity (resource, etc.)
-  entityType  String?  // Optional type of entity ("resource", "user", etc.)
-  metadata    String?  @db.Text // JSON string for additional data
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityId   String?
+  entityType String?
+  metadata   String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   @@index([userId])
   @@index([action])
@@ -131,27 +153,27 @@ model UserActivity {
 }
 
 model Badge {
-  id             String   @id @default(cuid())
-  name           String   @unique
-  description    String
-  icon           String   // Emoji or icon name
-  requirementType String  // "downloads", "favorites", "logins", "views"
-  requirementValue Int    // Number required to earn badge
-  createdAt      DateTime @default(now())
-
-  userBadges UserBadge[]
+  id               String   @id @default(cuid())
+  name             String   @unique
+  description      String
+  icon             String
+  requirementType  String
+  requirementValue Int
+  createdAt        DateTime @default(now())
 }
 
 model UserBadge {
-  id        String   @id @default(cuid())
-  userId    String
-  badgeId   String
-  earnedAt  DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
 
   @@unique([userId, badgeId])
   @@index([userId])
   @@index([badgeId])
+}
+
+enum Role {
+  USER
+  ADMIN
 }

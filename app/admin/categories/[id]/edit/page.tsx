@@ -3,12 +3,13 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, BookOpen, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getCategory, updateCategory } from "@/actions/category-actions"
 import { toast } from "sonner"
 
@@ -31,6 +32,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
     name: "",
   })
   const [errors, setErrors] = React.useState<Record<string, string>>({})
+  const [previewSlug, setPreviewSlug] = React.useState("")
 
   const loadCategory = React.useCallback(async () => {
     setIsLoading(true)
@@ -41,6 +43,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
       }
       setCategory(data)
       setFormData({ name: data.name })
+      setPreviewSlug(data.slug)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossible de charger la catégorie."
       toast.error(message)
@@ -54,11 +57,26 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
     void loadCategory()
   }, [loadCategory])
 
+  // Generate slug preview as user types
+  React.useEffect(() => {
+    const slug = formData.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    setPreviewSlug(slug)
+  }, [formData.name])
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
       newErrors.name = "Le nom est requis"
+    } else if (formData.name.length > 100) {
+      newErrors.name = "Le nom ne peut pas dépasser 100 caractères"
+    } else if (!/^[a-zA-Z0-9\sÀ-ÿ-]+$/.test(formData.name)) {
+      newErrors.name = "Caractères invalides (lettres, chiffres, espaces et tirets uniquement)"
     }
 
     setErrors(newErrors)
@@ -82,11 +100,15 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
       toast.dismiss(loadingToastId)
       toast.success("Catégorie mise à jour avec succès !")
       router.push("/admin/categories")
-      router.refresh()
     } catch (error) {
       toast.dismiss(loadingToastId)
       const message = error instanceof Error ? error.message : "Une erreur est survenue."
       toast.error(message)
+      
+      // Set error from server response
+      if (error instanceof Error && error.message.includes("existe déjà")) {
+        setErrors({ name: error.message })
+      }
     } finally {
       setIsSaving(false)
     }
@@ -110,6 +132,26 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
     )
   }
 
+  if (!category) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/admin/categories">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Modifier la catégorie</h1>
+            <p className="mt-1 text-muted-foreground">Catégorie introuvable</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const hasResources = category._count.resources > 0
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -118,77 +160,127 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight">Modifier la catégorie</h1>
           <p className="mt-1 text-muted-foreground">
-            Modifiez les informations de la catégorie.
+            Modifiez les informations de {category.name}
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Informations de la catégorie</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nom *</Label>
-              <Input
-                id="name"
-                placeholder="Ex: Mathématiques"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className={errors.name ? "border-destructive" : ""}
-              />
-              {errors.name && (
-                <p className="text-xs text-destructive">{errors.name}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Le slug sera régénéré automatiquement à partir du nom.
-              </p>
-            </div>
+      {hasResources && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Attention :</strong> Cette catégorie contient {category._count.resources} ressource(s). 
+            Le changement de nom mettra à jour toutes les ressources associées.
+          </AlertDescription>
+        </Alert>
+      )}
 
-            {category && (
-              <div className="space-y-2 pt-4 border-t">
-                <Label>Informations actuelles</Label>
-                <div className="grid gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Slug actuel:</span>{" "}
-                    <span className="font-mono">{category.slug}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Ressources:</span>{" "}
-                    <Badge variant="secondary">{category._count.resources}</Badge>
+      <form onSubmit={handleSubmit}>
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informations de la catégorie</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nom *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Ex: Mathématiques"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className={errors.name ? "border-destructive" : ""}
+                    maxLength={100}
+                  />
+                  {errors.name && (
+                    <p className="text-xs text-destructive">{errors.name}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Lettres, chiffres, espaces et tirets uniquement. Max 100 caractères.
+                  </p>
+                </div>
+
+                {previewSlug && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Slug généré: <code className="bg-muted px-1.5 py-0.5 rounded">{previewSlug}</code>
+                      {previewSlug !== category.slug && (
+                        <span className="ml-2 text-muted-foreground">(sera différent de l'actuel)</span>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informations actuelles</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Slug actuel</p>
+                  <p className="font-mono text-sm">{category.slug}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Ressources</p>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <Badge variant={hasResources ? "default" : "secondary"}>
+                      {category._count.resources}
+                    </Badge>
                   </div>
                 </div>
-              </div>
-            )}
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Date de création</p>
+                  <p className="text-sm">
+                    {new Date(category.createdAt).toLocaleDateString("fr-FR")}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="flex gap-2 pt-4">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Mise à jour...
-                  </>
-                ) : (
-                  "Enregistrer les modifications"
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                disabled={isSaving}
-              >
-                Annuler
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    "Enregistrer"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => router.back()}
+                  disabled={isSaving}
+                >
+                  Annuler
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </form>
     </div>
   )

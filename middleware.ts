@@ -1,4 +1,5 @@
 import { clerkMiddleware } from '@clerk/nextjs/server'
+import { adminMiddleware } from '@/lib/admin-middleware'
 
 export default clerkMiddleware()
 
@@ -9,4 +10,13 @@ export const config = {
     // Always run for API routes
     '/(api|trpc)(.*)',
   ],
+}
+
+// Apply admin middleware to admin routes
+export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin-login') {
+    return adminMiddleware(request)
+  }
+  
+  return clerkMiddleware()(request)
 }

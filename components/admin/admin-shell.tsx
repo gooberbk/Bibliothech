@@ -13,6 +13,7 @@ import {
   BookOpen,
   Folder,
   Users,
+  FileText,
 } from "lucide-react"
 import { logoutAdmin } from "@/actions/admin-auth-actions"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -33,6 +34,7 @@ const navigation = [
   { name: "Catégories", href: "/admin/categories", icon: Folder },
   { name: "Utilisateurs", href: "/admin/users", icon: Users },
   { name: "Admins", href: "/admin/admins", icon: KeyRound },
+  { name: "Historique", href: "/admin/audit", icon: FileText },
 ]
 
 function getBreadcrumbTitle(pathname: string): string {
@@ -41,10 +43,13 @@ function getBreadcrumbTitle(pathname: string): string {
   if (pathname === "/admin/categories") return "Catégories"
   if (pathname === "/admin/users") return "Utilisateurs"
   if (pathname === "/admin/admins") return "Admins"
+  if (pathname === "/admin/audit") return "Historique"
   if (pathname.startsWith("/admin/books/new")) return "Nouvelle Ressource"
+  if (pathname.startsWith("/admin/books/")) return "Modifier Ressource"
   if (pathname.startsWith("/admin/categories/new")) return "Nouvelle Catégorie"
   if (pathname.startsWith("/admin/categories/")) return "Modifier Catégorie"
   if (pathname.startsWith("/admin/users/")) return "Modifier Utilisateur"
+  if (pathname.startsWith("/admin/admins/")) return "Modifier Admin"
   return "Admin"
 }
 
