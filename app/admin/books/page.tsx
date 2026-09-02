@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import {
   Plus,
   BookOpen,
@@ -52,6 +53,7 @@ type PaginatedResourcesResponse = {
 
 export default function AdminBooksPage() {
   const router = useRouter()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = React.useState("")
   const [categoryFilter, setCategoryFilter] = React.useState("all")
   const [categories, setCategories] = React.useState<string[]>([])
@@ -64,6 +66,17 @@ export default function AdminBooksPage() {
   const [currentPage, setCurrentPage] = React.useState(1)
   const itemsPerPage = 10
 
+  // Load categories
+  const loadCategories = React.useCallback(async () => {
+    try {
+      const data = await getCategories()
+      setCategories(data.map(c => c.name))
+    } catch (err) {
+      console.error("Failed to load categories:", err)
+    }
+  }, [])
+
+  // Load resources with filters and pagination
   // Load categories
   const loadCategories = React.useCallback(async () => {
     try {
@@ -121,6 +134,7 @@ export default function AdminBooksPage() {
     loadResources()
   }, [loadResources])
 
+  // Reset to page 1 when filters change
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1)
@@ -203,7 +217,14 @@ export default function AdminBooksPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
+      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/admin">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/admin">
@@ -216,7 +237,13 @@ export default function AdminBooksPage() {
               {resourcesData ? `${resourcesData.total} ressource(s)` : "Gérez les ressources de la bibliothèque"}
             </p>
           </div>
+          </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={loadResources} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={loadResources} disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />

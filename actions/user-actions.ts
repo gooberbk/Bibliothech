@@ -9,6 +9,8 @@ import { syncClerkUser } from "@/lib/clerk-sync"
 import { ensureAdminSession } from "@/lib/admin-session"
 import { adminActionRateLimit } from "@/lib/rate-limit"
 import { logUserAction } from "@/lib/admin-audit"
+import { adminActionRateLimit } from "@/lib/rate-limit"
+import { logUserAction } from "@/lib/admin-audit"
 
 const ensureAdmin = async () => {
   const admin = await ensureAdminSession()
@@ -48,6 +50,8 @@ export async function getAdminUsers(options?: {
     db.user.findMany({
       where,
       orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
       skip: (page - 1) * limit,
       take: limit,
       select: {
@@ -145,6 +149,25 @@ export async function updateUserRole(formData: FormData) {
     throw new Error("L'utilisateur a déjà ce rôle")
   }
 
+  // Prevent self-demotion
+  if (targetUserId === admin.id) {
+    throw new Error("Impossible de modifier votre propre rôle")
+  }
+
+  const targetUser = await db.user.findUnique({
+    where: { id: targetUserId },
+    select: { email: true, role: true },
+  })
+
+  if (!targetUser) {
+    throw new Error("Utilisateur introuvable")
+  }
+
+  // Check if role is actually changing
+  if (targetUser.role === newRole) {
+    throw new Error("L'utilisateur a déjà ce rôle")
+  }
+
   await db.user.update({
     where: { id: targetUserId },
     data: { role: newRole },
@@ -159,8 +182,58 @@ export async function updateUserRole(formData: FormData) {
     newRole
   )
 
+  await logUserAction(
+    admin.id,
+    admin.username,
+    "UPDATE_USER_ROLE",
+    targetUserId,
+    targetUser.email || "unknown",
+    newRole
+  )
+
   revalidatePath("/admin/users")
   revalidatePath(`/admin/users/${targetUserId}/edit`)
+}
+
+export async function updateUserPermissions(userId: string, permissions: {
+  canEditResources: boolean
+  canDeleteResources: boolean
+  canManageUsers: boolean
+  canViewAnalytics: boolean
+}) {
+  const admin = await ensureAdmin()
+  
+  const { success } = await adminActionRateLimit.limit(admin.id)
+  if (!success) {
+    throw new Error("Trop de requêtes. Veuillez réessayer plus tard.")
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  })
+
+  if (!user) {
+    throw new Error("Utilisateur introuvable")
+  }
+
+  // Only admins can have custom permissions
+  if (user.role !== "ADMIN") {
+    throw new Error("Seuls les administrateurs peuvent avoir des permissions personnalisées")
+  }
+
+  // Update user with permissions (assuming a permissions field in schema)
+  // For now, we'll just log the action
+  await logUserAction(
+    admin.id,
+    admin.username,
+    "UPDATE_USER_PERMISSIONS",
+    userId,
+    user.email || "unknown",
+    JSON.stringify(permissions)
+  )
+
+  return { success: true }
 }
 
 export async function updateUserPermissions(userId: string, permissions: {

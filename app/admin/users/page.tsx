@@ -16,6 +16,7 @@ import { UserFilters } from "@/components/admin/user-filters"
 import { Pagination } from "@/components/admin/pagination"
 import { getAdminUsers } from "@/actions/user-actions"
 import { toast } from "sonner"
+import { toast } from "sonner"
 
 type User = {
   id: string
@@ -38,9 +39,20 @@ type PaginatedUsersResponse = {
   totalPages: number
 }
 
+type PaginatedUsersResponse = {
+  users: User[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
 export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = React.useState("")
   const [roleFilter, setRoleFilter] = React.useState<"ALL" | "USER" | "ADMIN">("ALL")
+  const [usersData, setUsersData] = React.useState<PaginatedUsersResponse | null>(null)
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
   const [usersData, setUsersData] = React.useState<PaginatedUsersResponse | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -137,7 +149,30 @@ export default function AdminUsersPage() {
         </Card>
       )}
 
+      {/* Error State */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
+      {usersData && (
+        <UserFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          roleFilter={roleFilter}
+          onRoleChange={setRoleFilter}
+          selectedCount={0}
+          onClearFilters={handleClearFilters}
+          totalUsers={usersData.total}
+        />
+      )}
+
+      {/* Empty State */}
+      {!isLoading && usersData && usersData.users.length === 0 && (
       {usersData && (
         <UserFilters
           searchQuery={searchQuery}

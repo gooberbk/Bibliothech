@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getCategory, updateCategory } from "@/actions/category-actions"
 import { toast } from "sonner"
 
@@ -33,6 +34,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
   })
   const [errors, setErrors] = React.useState<Record<string, string>>({})
   const [previewSlug, setPreviewSlug] = React.useState("")
+  const [previewSlug, setPreviewSlug] = React.useState("")
 
   const loadCategory = React.useCallback(async () => {
     setIsLoading(true)
@@ -43,6 +45,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
       }
       setCategory(data)
       setFormData({ name: data.name })
+      setPreviewSlug(data.slug)
       setPreviewSlug(data.slug)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossible de charger la catégorie."
@@ -68,11 +71,26 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
     setPreviewSlug(slug)
   }, [formData.name])
 
+  // Generate slug preview as user types
+  React.useEffect(() => {
+    const slug = formData.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    setPreviewSlug(slug)
+  }, [formData.name])
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.name.trim()) {
       newErrors.name = "Le nom est requis"
+    } else if (formData.name.length > 100) {
+      newErrors.name = "Le nom ne peut pas dépasser 100 caractères"
+    } else if (!/^[a-zA-Z0-9\sÀ-ÿ-]+$/.test(formData.name)) {
+      newErrors.name = "Caractères invalides (lettres, chiffres, espaces et tirets uniquement)"
     } else if (formData.name.length > 100) {
       newErrors.name = "Le nom ne peut pas dépasser 100 caractères"
     } else if (!/^[a-zA-Z0-9\sÀ-ÿ-]+$/.test(formData.name)) {
@@ -104,6 +122,11 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
       toast.dismiss(loadingToastId)
       const message = error instanceof Error ? error.message : "Une erreur est survenue."
       toast.error(message)
+      
+      // Set error from server response
+      if (error instanceof Error && error.message.includes("existe déjà")) {
+        setErrors({ name: error.message })
+      }
       
       // Set error from server response
       if (error instanceof Error && error.message.includes("existe déjà")) {
@@ -152,6 +175,26 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
 
   const hasResources = category._count.resources > 0
 
+  if (!category) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/admin/categories">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Modifier la catégorie</h1>
+            <p className="mt-1 text-muted-foreground">Catégorie introuvable</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const hasResources = category._count.resources > 0
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -178,7 +221,19 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
         </Alert>
       )}
 
+      {hasResources && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Attention :</strong> Cette catégorie contient {category._count.resources} ressource(s). 
+            Le changement de nom mettra à jour toutes les ressources associées.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <form onSubmit={handleSubmit}>
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-6">
         <div className="grid gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
             <Card>
@@ -196,6 +251,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
                       setFormData({ ...formData, name: e.target.value })
                     }
                     className={errors.name ? "border-destructive" : ""}
+                    maxLength={100}
                     maxLength={100}
                   />
                   {errors.name && (
@@ -245,6 +301,11 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
                   <p className="text-sm">
                     {new Date(category.createdAt).toLocaleDateString("fr-FR")}
                   </p>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Date de création</p>
+                  <p className="text-sm">
+                    {new Date(category.createdAt).toLocaleDateString("fr-FR")}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -272,6 +333,7 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
                   type="button"
                   variant="outline"
                   className="w-full"
+                  className="w-full"
                   onClick={() => router.back()}
                   disabled={isSaving}
                 >
@@ -279,6 +341,8 @@ export default function EditCategoryPage({ params }: { params: Promise<{ id: str
                 </Button>
               </CardContent>
             </Card>
+          </div>
+        </div>
           </div>
         </div>
       </form>

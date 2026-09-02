@@ -2,10 +2,13 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Loader2, Save, Shield, User, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -62,9 +65,18 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
         const { count } = await allUsers.json()
         setAdminCount(count)
       }
+      setFormData({ role: data.role })
+      
+      // Get admin count for warning
+      const allUsers = await fetch("/api/admin/users-count")
+      if (allUsers.ok) {
+        const { count } = await allUsers.json()
+        setAdminCount(count)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossible de charger l'utilisateur."
       toast.error(message)
+      router.push("/admin/users")
       router.push("/admin/users")
     } finally {
       setIsLoading(false)
@@ -116,6 +128,14 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
           setErrors({ role: error.message })
         }
       }
+      
+      if (error instanceof Error) {
+        if (error.message.includes("dernier administrateur")) {
+          setErrors({ role: error.message })
+        } else if (error.message.includes("votre propre rôle")) {
+          setErrors({ role: error.message })
+        }
+      }
     } finally {
       setIsSaving(false)
     }
@@ -156,6 +176,10 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
       </div>
     )
   }
+
+  const isAdmin = user.role === "ADMIN"
+  const isAdminCount = adminCount <= 1 && isAdmin
+  const wouldBeLastAdmin = isAdminCount && formData.role === "USER"
 
   const isAdmin = user.role === "ADMIN"
   const isAdminCount = adminCount <= 1 && isAdmin
@@ -242,6 +266,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                         <Switch checked disabled />
                       </div>
                       <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">Gestion des catégories</p>
                           <p className="text-xs text-muted-foreground">Créer, modifier et supprimer des catégories</p>
@@ -249,12 +274,14 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                         <Switch checked disabled />
                       </div>
                       <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">Gestion des utilisateurs</p>
                           <p className="text-xs text-muted-foreground">Modifier les rôles et permissions</p>
                         </div>
                         <Switch checked disabled />
                       </div>
+                      <div className="flex items-center justify-between">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">Accès aux analytics</p>
@@ -267,6 +294,7 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                 )}
               </CardContent>
             </Card>
+          </div>
           </div>
 
           <div className="space-y-6">

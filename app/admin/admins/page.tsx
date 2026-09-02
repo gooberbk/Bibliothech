@@ -16,6 +16,9 @@ import { Label } from "@/components/ui/label"
 import { AdminCard } from "@/components/admin/admin-card"
 import { getAdminAccounts, createAdminAccount, toggleAdminAccount, deleteAdminAccount, updateAdminPassword, getAdminLoginHistory } from "@/actions/admin-account-actions"
 import { toast } from "sonner"
+import { AdminCard } from "@/components/admin/admin-card"
+import { getAdminAccounts, createAdminAccount, toggleAdminAccount, deleteAdminAccount, updateAdminPassword, getAdminLoginHistory } from "@/actions/admin-account-actions"
+import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
@@ -252,6 +255,14 @@ export default function AdminAccountsPage() {
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/admin">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Admins</h1>
             <p className="mt-1 text-muted-foreground">
@@ -269,6 +280,16 @@ export default function AdminAccountsPage() {
         </div>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Create Admin Form */}
       {/* Error State */}
       {error && (
         <Card className="border-destructive/50 bg-destructive/5">
@@ -331,6 +352,17 @@ export default function AdminAccountsPage() {
         </CardContent>
       </Card>
 
+      {/* Admins Grid */}
+      {isLoading ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+              <p className="text-sm text-muted-foreground">Chargement des comptes admin...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : admins.length === 0 ? (
       {/* Admins Grid */}
       {isLoading ? (
         <Card>
@@ -458,6 +490,7 @@ export default function AdminAccountsPage() {
               <Button type="submit">
                 Changer le mot de passe
               </Button>
+            </div>
             </div>
           </form>
         </DialogContent>

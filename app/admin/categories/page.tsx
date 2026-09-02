@@ -8,6 +8,8 @@ import {
   ArrowLeft,
   RefreshCw,
   Search,
+  RefreshCw,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,12 +30,14 @@ type Category = {
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = React.useState<Category[]>([])
   const [filteredCategories, setFilteredCategories] = React.useState<Category[]>([])
+  const [filteredCategories, setFilteredCategories] = React.useState<Category[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
 
   const loadCategories = React.useCallback(async () => {
     setIsLoading(true)
+    setError(null)
     setError(null)
     try {
       const data = await getCategories()
@@ -87,8 +91,14 @@ export default function AdminCategoriesPage() {
     setSearchQuery("")
   }
 
+  const handleClearSearch = () => {
+    setSearchQuery("")
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
@@ -105,7 +115,13 @@ export default function AdminCategoriesPage() {
                 : "Gérez les catégories de ressources de la bibliothèque"}
             </p>
           </div>
+          </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={loadCategories} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={loadCategories} disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />

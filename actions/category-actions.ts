@@ -5,6 +5,8 @@ import { db } from "@/lib/db"
 import { ensureAdminSession } from "@/lib/admin-session"
 import { adminActionRateLimit } from "@/lib/rate-limit"
 import { logCategoryAction } from "@/lib/admin-audit"
+import { adminActionRateLimit } from "@/lib/rate-limit"
+import { logCategoryAction } from "@/lib/admin-audit"
 import { z } from "zod"
 
 const CategorySchema = z.object({
@@ -69,12 +71,43 @@ export const createCategory = async (data: CreateCategoryInput) => {
     throw new Error("Une catégorie avec ce nom existe déjà")
   }
 
+  // Check for slug uniqueness
+  const existingCategory = await db.category.findUnique({
+    where: { slug },
+  })
+
+  if (existingCategory) {
+    throw new Error("Une catégorie avec ce nom existe déjà")
+  }
+
+  // Check for name uniqueness (case-insensitive)
+  const existingName = await db.category.findFirst({
+    where: {
+      name: {
+        equals: payload.name,
+        mode: 'insensitive',
+      },
+    },
+  })
+
+  if (existingName) {
+    throw new Error("Une catégorie avec ce nom existe déjà")
+  }
+
   const category = await db.category.create({
     data: {
       name: payload.name,
       slug,
     },
   })
+
+  await logCategoryAction(
+    admin.id,
+    admin.username,
+    "CREATE_CATEGORY",
+    category.id,
+    category.name
+  )
 
   await logCategoryAction(
     admin.id,
@@ -129,6 +162,15 @@ export const updateCategory = async (data: UpdateCategoryInput) => {
     throw new Error("Catégorie introuvable")
   }
 
+  // Get current category
+  const currentCategory = await db.category.findUnique({
+    where: { id: categoryId },
+  })
+
+  if (!currentCategory) {
+    throw new Error("Catégorie introuvable")
+  }
+
   // Generate new slug from updated name
   const slug = payload.name
     .toLowerCase()
@@ -136,6 +178,34 @@ export const updateCategory = async (data: UpdateCategoryInput) => {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+
+  // Check for slug uniqueness if slug changed
+  if (slug !== currentCategory.slug) {
+    const existingSlug = await db.category.findUnique({
+      where: { slug },
+    })
+
+    if (existingSlug) {
+      throw new Error("Une catégorie avec ce nom existe déjà")
+    }
+  }
+
+  // Check for name uniqueness if name changed (case-insensitive)
+  if (payload.name.toLowerCase() !== currentCategory.name.toLowerCase()) {
+    const existingName = await db.category.findFirst({
+      where: {
+        name: {
+          equals: payload.name,
+          mode: 'insensitive',
+        },
+        id: { not: categoryId },
+      },
+    })
+
+    if (existingName) {
+      throw new Error("Une catégorie avec ce nom existe déjà")
+    }
+  }
 
   // Check for slug uniqueness if slug changed
   if (slug !== currentCategory.slug) {
@@ -187,6 +257,14 @@ export const updateCategory = async (data: UpdateCategoryInput) => {
     category.name
   )
 
+  await logCategoryAction(
+    admin.id,
+    admin.username,
+    "UPDATE_CATEGORY",
+    category.id,
+    category.name
+  )
+
   revalidatePath("/admin/categories")
   revalidatePath(`/admin/categories/${categoryId}`)
   return category
@@ -218,6 +296,14 @@ export const deleteCategory = async (id: string) => {
   await db.category.delete({
     where: { id: categoryId },
   })
+
+  await logCategoryAction(
+    admin.id,
+    admin.username,
+    "DELETE_CATEGORY",
+    categoryId,
+    category.name
+  )
 
   await logCategoryAction(
     admin.id,

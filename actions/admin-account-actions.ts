@@ -2,10 +2,16 @@
 
 import { revalidatePath } from "next/cache"
 import { headers } from "next/headers"
+import { headers } from "next/headers"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { ensureAdminSession } from "@/lib/admin-session"
 import { hashAdminPassword } from "@/lib/admin-password"
+import { adminActionRateLimit } from "@/lib/rate-limit"
+import { 
+  logAdminAccountAction, 
+  invalidateAdminSessions 
+} from "@/lib/admin-audit"
 import { adminActionRateLimit } from "@/lib/rate-limit"
 import { 
   logAdminAccountAction, 
@@ -82,6 +88,38 @@ export async function getAdminLoginHistory(adminId: string, limit: number = 20) 
   })
 }
 
+export async function getAdminLoginHistory(adminId: string, limit: number = 20) {
+  const admin = await ensureAdminSession()
+  
+  const { success } = await adminActionRateLimit.limit(admin.id)
+  if (!success) {
+    throw new Error("Trop de requêtes. Veuillez réessayer plus tard.")
+  }
+
+  const targetAdmin = await db.adminAccount.findUnique({
+    where: { id: adminId },
+    select: { username: true },
+  })
+
+  if (!targetAdmin) {
+    throw new Error("Compte admin introuvable")
+  }
+
+  return db.adminLoginHistory.findMany({
+    where: { adminId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      ipAddress: true,
+      userAgent: true,
+      success: true,
+      failureReason: true,
+      createdAt: true,
+    },
+  })
+}
+
 export async function createAdminAccount(formData: FormData) {
   const admin = await ensureAdminSession()
   
@@ -119,6 +157,14 @@ export async function createAdminAccount(formData: FormData) {
     newAdmin.username
   )
 
+  await logAdminAccountAction(
+    admin.id,
+    admin.username,
+    "CREATE_ADMIN",
+    newAdmin.id,
+    newAdmin.username
+  )
+
   revalidatePath("/admin/admins")
 }
 
@@ -147,10 +193,35 @@ export async function updateAdminPassword(formData: FormData) {
     throw new Error("Impossible de modifier votre propre mot de passe depuis cette interface")
   }
 
+  const targetAdmin = await db.adminAccount.findUnique({
+    where: { id },
+    select: { username: true },
+  })
+
+  if (!targetAdmin) {
+    throw new Error("Compte admin introuvable")
+  }
+
+  // Prevent self-password change (optional, depending on requirements)
+  if (id === admin.id) {
+    throw new Error("Impossible de modifier votre propre mot de passe depuis cette interface")
+  }
+
   await db.adminAccount.update({
     where: { id },
     data: { passwordHash: hashAdminPassword(password) },
   })
+
+  // Invalidate all sessions for the target admin
+  await invalidateAdminSessions(id)
+
+  await logAdminAccountAction(
+    admin.id,
+    admin.username,
+    "UPDATE_ADMIN_PASSWORD",
+    id,
+    targetAdmin.username
+  )
 
   // Invalidate all sessions for the target admin
   await invalidateAdminSessions(id)
@@ -196,10 +267,33 @@ export async function toggleAdminAccount(formData: FormData) {
     throw new Error("Compte admin introuvable")
   }
 
+  const targetAdmin = await db.adminAccount.findUnique({
+    where: { id },
+    select: { username: true },
+  })
+
+  if (!targetAdmin) {
+    throw new Error("Compte admin introuvable")
+  }
+
   await db.adminAccount.update({
     where: { id },
     data: { active },
   })
+
+  // Invalidate sessions if deactivating
+  if (!active) {
+    await invalidateAdminSessions(id)
+  }
+
+  await logAdminAccountAction(
+    admin.id,
+    admin.username,
+    "TOGGLE_ADMIN_STATUS",
+    id,
+    targetAdmin.username,
+    { newStatus: active ? "active" : "inactive" }
+  )
 
   // Invalidate sessions if deactivating
   if (!active) {
@@ -247,6 +341,15 @@ export async function deleteAdminAccount(formData: FormData) {
   }
 
   await db.adminAccount.delete({ where: { id } })
+  
+  await logAdminAccountAction(
+    admin.id,
+    admin.username,
+    "DELETE_ADMIN",
+    id,
+    target.username
+  )
+  
   
   await logAdminAccountAction(
     admin.id,
